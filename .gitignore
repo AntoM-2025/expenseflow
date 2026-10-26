@@ -1,0 +1,18 @@
+# Variabili d'ambiente e credenziali
+.env
+.env.*
+!.env.example
+
+# Dipendenze
+node_modules/
+**/node_modules/
+
+# File generati
+dist/
+**/dist/
+
+# Log
+*.log
+
+# macOS
+.DS_Store
