@@ -1,5 +1,9 @@
-
 services:
+
+  # ==========================================
+  # DATABASE POSTGRESQL
+  # ==========================================
+
   db:
     image: postgres:18
     restart: unless-stopped
@@ -22,6 +26,40 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # ==========================================
+  # EXPENSEFLOW
+  # ==========================================
+
+  app:
+    image: expenseflow:beta
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    environment:
+      NODE_ENV: development
+      PORT: "10000"
+
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      APP_ORIGINS: http://localhost:3200
+
+    ports:
+      - "127.0.0.1:3200:10000"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+# ==========================================
+# VOLUMI
+# ==========================================
 
 volumes:
   postgres_data:

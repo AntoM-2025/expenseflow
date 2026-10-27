@@ -13,6 +13,11 @@ import {
   getSessionToken,
 } from "../auth/session.ts";
 
+import {
+  loginRateLimiter,
+  registerRateLimiter,
+} from "../middleware/authRateLimit.ts";
+
 // ==========================================
 // CONFIGURAZIONE ROUTER
 // ==========================================
@@ -81,7 +86,10 @@ const loginSchema = z.object({
 // Registrazione nuovo utente
 // ==========================================
 
-authRouter.post("/register", async (req, res) => {
+authRouter.post(
+  "/register",
+  registerRateLimiter,
+  async (req, res) => {
   const validation = registerSchema.safeParse(req.body);
 
   if (!validation.success) {
@@ -172,7 +180,10 @@ authRouter.post("/register", async (req, res) => {
 // POST /api/auth/login
 // ==========================================
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post(
+  "/login",
+  loginRateLimiter,
+  async (req, res) => {
   const validation = loginSchema.safeParse(req.body);
 
   if (!validation.success) {
