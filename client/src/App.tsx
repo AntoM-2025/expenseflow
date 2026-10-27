@@ -1,54 +1,86 @@
-import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
-import './App.css'
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+
+import "./App.css";
 
 // ==========================================
 // TIPI TYPESCRIPT
 // ==========================================
 
-type Payer = 'Antonio' | 'Marta'
+type Payer = {
+  id: string;
+  name: string;
+};
 
 type Expense = {
-  id: string
-  amountCents: number
-  category: string
-  description: string | null
-  expenseDate: string
-  payer: Payer
-}
+  id: string;
+  amountCents: number;
+  category: string;
+  description: string | null;
+  expenseDate: string;
+  payerId: string | null;
+  payer: string;
+  createdAt: string;
+};
 
-// Proprietà del componente ExpenseTable
 type ExpenseTableProps = {
-  payer: Payer
-  expenses: Expense[]
-  deletingId: string | null
-  onDelete: (expense: Expense) => Promise<void>
-}
+  payer: Payer;
+  expenses: Expense[];
+  deletingId: string | null;
+  onDelete: (expense: Expense) => Promise<void>;
+};
 
 // ==========================================
 // FUNZIONI DI UTILITÀ
 // ==========================================
 
 function formatCurrency(amountCents: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(amountCents / 100)
+  return new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amountCents / 100);
 }
 
 function formatDate(date: string): string {
-  const [year, month, day] = date.split('-')
-  return `${day}/${month}/${year}`
+  const [year, month, day] = date.split("-");
+
+  return `${day}/${month}/${year}`;
 }
 
 function getTodayDate(): string {
-  const today = new Date()
+  const today = new Date();
 
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
+  const year = today.getFullYear();
 
-  return `${year}-${month}-${day}`
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function sortPayers(a: Payer, b: Payer): number {
+  return a.name.localeCompare(b.name, "it", {
+    sensitivity: "base",
+  });
+}
+
+async function getApiError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const data: unknown = await response.json().catch(() => null);
+
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "error" in data &&
+    typeof data.error === "string"
+  ) {
+    return data.error;
+  }
+
+  return fallback;
 }
 
 // ==========================================
@@ -63,13 +95,13 @@ function ExpenseTable({
 }: ExpenseTableProps) {
   const subtotal = expenses.reduce(
     (total, expense) => total + expense.amountCents,
-    0
-  )
+    0,
+  );
 
   return (
     <section className="expenses-section">
       <div className="section-header">
-        <h2>Spese di {payer}</h2>
+        <h2>Spese di {payer.name}</h2>
 
         <span>
           {expenses.length} operazioni · {formatCurrency(subtotal)}
@@ -77,7 +109,7 @@ function ExpenseTable({
       </div>
 
       {expenses.length === 0 ? (
-        <p>Nessuna spesa registrata per {payer}.</p>
+        <p>Nessuna spesa registrata per {payer.name}.</p>
       ) : (
         <div className="table-container">
           <table>
@@ -98,7 +130,7 @@ function ExpenseTable({
 
                   <td>{expense.category}</td>
 
-                  <td>{expense.description ?? '—'}</td>
+                  <td>{expense.description ?? "—"}</td>
 
                   <td className="amount">
                     {formatCurrency(expense.amountCents)}
@@ -139,7 +171,7 @@ function ExpenseTable({
         </div>
       )}
     </section>
-  )
+  );
 }
 
 // ==========================================
@@ -147,96 +179,196 @@ function ExpenseTable({
 // ==========================================
 
 function App() {
-  // Elenco delle spese
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // ========================================
+  // DATI
+  // ========================================
 
-  // Campi del modulo
-  const [amount, setAmount] = useState('')
-  const [category, setCategory] = useState('Alimentari')
-  const [description, setDescription] = useState('')
-  const [expenseDate, setExpenseDate] = useState(getTodayDate)
+  const [payers, setPayers] = useState<Payer[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
-  // Nuovo campo pagatore
-  const [payer, setPayer] = useState<Payer>('Antonio')
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Stato del salvataggio
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  // ========================================
+  // NUOVO PAGATORE
+  // ========================================
 
-  // Stato dell'eliminazione
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [newPayerName, setNewPayerName] = useState("");
 
-  // ==========================================
-  // CARICAMENTO DELLE SPESE
-  // ==========================================
+  const [addingPayer, setAddingPayer] = useState(false);
+
+  const [payerError, setPayerError] = useState<string | null>(null);
+
+  const [payerSuccess, setPayerSuccess] = useState(false);
+
+  // ========================================
+  // CAMPI NUOVA SPESA
+  // ========================================
+
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Alimentari");
+  const [description, setDescription] = useState("");
+  const [expenseDate, setExpenseDate] = useState(getTodayDate);
+
+  // Nome libero, nessun valore predefinito
+  const [payerId, setPayerId] = useState("");
+
+  // ========================================
+  // STATI SALVATAGGIO
+  // ========================================
+
+  const [saving, setSaving] = useState(false);
+
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // ========================================
+  // STATI ELIMINAZIONE
+  // ========================================
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // ========================================
+  // CARICAMENTO DATI
+  // ========================================
 
   useEffect(() => {
-    const controller = new AbortController()
+    const controller = new AbortController();
 
-    async function loadExpenses() {
+    async function loadData() {
       try {
-        const response = await fetch('/api/expenses', {
-          signal: controller.signal,
-        })
+        const [payersResponse, expensesResponse] = await Promise.all([
+          fetch("/api/payers", {
+            signal: controller.signal,
+          }),
 
-        if (!response.ok) {
-          throw new Error('Impossibile recuperare le spese')
+          fetch("/api/expenses", {
+            signal: controller.signal,
+          }),
+        ]);
+
+        if (!payersResponse.ok) {
+          throw new Error("Impossibile recuperare i pagatori");
         }
 
-        const data: Expense[] = await response.json()
+        if (!expensesResponse.ok) {
+          throw new Error("Impossibile recuperare le spese");
+        }
+
+        const [payersData, expensesData] = await Promise.all([
+          payersResponse.json() as Promise<Payer[]>,
+          expensesResponse.json() as Promise<Expense[]>,
+        ]);
 
         if (!controller.signal.aborted) {
-          setExpenses(data)
+          setPayers(payersData.sort(sortPayers));
+          setExpenses(expensesData);
         }
       } catch (err) {
         if (!controller.signal.aborted) {
           setError(
             err instanceof Error
               ? err.message
-              : 'Si è verificato un errore'
-          )
+              : "Errore durante il caricamento",
+          );
         }
       } finally {
         if (!controller.signal.aborted) {
-          setLoading(false)
+          setLoading(false);
         }
       }
     }
 
-    void loadExpenses()
+    void loadData();
 
-    return () => controller.abort()
-  }, [])
+    return () => controller.abort();
+  }, []);
 
-  // ==========================================
-  // AGGIUNTA DI UNA SPESA
-  // ==========================================
+  // ========================================
+  // AGGIUNTA PAGATORE
+  // ========================================
 
-  async function handleAddExpense(
-    event: FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault()
+  async function handleAddPayer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-    setSaveError(null)
-    setSaveSuccess(false)
+    setPayerError(null);
+    setPayerSuccess(false);
 
-    const normalizedAmount = amount.trim().replace(',', '.')
+    const name = newPayerName.trim();
 
-    if (!/^\d+(\.\d{1,2})?$/.test(normalizedAmount)) {
-      setSaveError(
-        'Inserisci un importo valido, con massimo due decimali.'
-      )
-      return
+    if (!name || name.length > 100) {
+      setPayerError("Inserisci un nome da 1 a 100 caratteri.");
+      return;
     }
 
-    const [euros, cents = ''] = normalizedAmount.split('.')
+    setAddingPayer(true);
 
-    const amountCents =
-      Number(euros) * 100 + Number(cents.padEnd(2, '0'))
+    try {
+      const response = await fetch("/api/payers", {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          name,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getApiError(response, "Impossibile creare il pagatore"),
+        );
+      }
+
+      const newPayer: Payer = await response.json();
+
+      setPayers((previousPayers) =>
+        [...previousPayers, newPayer].sort(sortPayers),
+      );
+      // Seleziona il pagatore appena creato
+      setPayerId(newPayer.id);
+      setNewPayerName("");
+      setPayerSuccess(true);
+    } catch (err) {
+      setPayerError(
+        err instanceof Error ? err.message : "Errore durante il salvataggio",
+      );
+    } finally {
+      setAddingPayer(false);
+    }
+  }
+
+  // ========================================
+  // AGGIUNTA SPESA
+  // ========================================
+
+  async function handleAddExpense(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    if (!payerId || !payers.some((payer) => payer.id === payerId)) {
+      setSaveError("Seleziona un pagatore prima di registrare la spesa.");
+
+      return;
+    }
+
+    const normalizedAmount = amount.trim().replace(",", ".");
+
+    if (!/^\d+(\.\d{1,2})?$/.test(normalizedAmount)) {
+      setSaveError("Inserisci un importo valido con massimo due decimali.");
+      return;
+    }
+
+    const [euros, cents = ""] = normalizedAmount.split(".");
+
+    const amountCents = Number(euros) * 100 + Number(cents.padEnd(2, "0"));
 
     if (
       !Number.isSafeInteger(amountCents) ||
@@ -244,246 +376,354 @@ function App() {
       amountCents > 100_000_000
     ) {
       setSaveError(
-        'Inserisci un importo maggiore di zero e non superiore a 1.000.000 €.'
-      )
-      return
+        "L’importo deve essere maggiore di zero e non superiore a 1.000.000 €.",
+      );
+      return;
     }
 
-    setSaving(true)
+    setSaving(true);
 
     try {
-      const response = await fetch('/api/expenses', {
-        method: 'POST',
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           amountCents,
           category,
           description: description.trim() || undefined,
           expenseDate,
-          payer,
+          payerId,
         }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error('Impossibile salvare la spesa')
+        throw new Error(
+          await getApiError(response, "Impossibile salvare la spesa"),
+        );
       }
 
-      const newExpense: Expense = await response.json()
+      const newExpense: Expense = await response.json();
 
+      // Aggiorniamo le spese.
       setExpenses((previousExpenses) =>
         [newExpense, ...previousExpenses].sort((a, b) =>
-          b.expenseDate.localeCompare(a.expenseDate)
-        )
-      )
+          b.expenseDate.localeCompare(a.expenseDate),
+        ),
+      );
 
-      setAmount('')
-      setDescription('')
-      setSaveSuccess(true)
+      // Se abbiamo digitato un nome nuovo,
+      // aggiungiamolo anche all'elenco dei pagatori.
+      if (newExpense.payerId) {
+        setPayers((previousPayers) => {
+          const alreadyExists = previousPayers.some(
+            (payer) => payer.id === newExpense.payerId,
+          );
+
+          if (alreadyExists) {
+            return previousPayers;
+          }
+
+          const newPayer: Payer = {
+            id: newExpense.payerId!,
+            name: newExpense.payer,
+          };
+
+          return [...previousPayers, newPayer].sort(sortPayers);
+        });
+      }
+
+      setAmount("");
+      setDescription("");
+      setSaveSuccess(true);
     } catch (err) {
       setSaveError(
-        err instanceof Error
-          ? err.message
-          : 'Si è verificato un errore'
-      )
+        err instanceof Error ? err.message : "Errore durante il salvataggio",
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  // ==========================================
-  // ELIMINAZIONE DI UNA SPESA
-  // ==========================================
+  // ========================================
+  // ELIMINAZIONE SPESA
+  // ========================================
 
   async function handleDeleteExpense(expense: Expense) {
     if (deletingId !== null) {
-      return
+      return;
     }
 
     const confirmed = window.confirm(
-      `Vuoi eliminare la spesa "${expense.description ?? expense.category}" di ${expense.payer} (${formatCurrency(expense.amountCents)})?\n\nQuesta operazione è definitiva.`
-    )
+      `Vuoi eliminare la spesa "${expense.description ?? expense.category}" di ${expense.payer} (${formatCurrency(expense.amountCents)})?\n\nQuesta operazione è definitiva.`,
+    );
 
     if (!confirmed) {
-      return
+      return;
     }
 
-    setDeleteError(null)
-    setDeletingId(expense.id)
+    setDeleteError(null);
+    setDeletingId(expense.id);
 
     try {
       const response = await fetch(
         `/api/expenses/${encodeURIComponent(expense.id)}`,
         {
-          method: 'DELETE',
-        }
-      )
+          method: "DELETE",
+        },
+      );
 
       if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(
-            'Spesa non trovata. Aggiorna la pagina e riprova.'
-          )
-        }
-
-        throw new Error('Impossibile eliminare la spesa')
+        throw new Error(
+          await getApiError(response, "Impossibile eliminare la spesa"),
+        );
       }
 
-      // Rimuoviamo la spesa dalla dashboard
-      // solo dopo la conferma del server
       setExpenses((previousExpenses) =>
-        previousExpenses.filter(
-          (item) => item.id !== expense.id
-        )
-      )
+        previousExpenses.filter((item) => item.id !== expense.id),
+      );
     } catch (err) {
       setDeleteError(
-        err instanceof Error
-          ? err.message
-          : 'Si è verificato un errore'
-      )
+        err instanceof Error ? err.message : "Errore durante l’eliminazione",
+      );
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
   }
 
-  // ==========================================
-  // FILTRI PER PAGATORE
-  // ==========================================
+  // ========================================
+  // FILTRI E TOTALI
+  // ========================================
 
-  const antonioExpenses = expenses.filter(
-    (expense) => expense.payer === 'Antonio'
-  )
-
-  const martaExpenses = expenses.filter(
-    (expense) => expense.payer === 'Marta'
-  )
-
-  // ==========================================
-  // CALCOLO TOTALI
-  // ==========================================
+  function getPayerExpenses(payer: Payer): Expense[] {
+    return expenses.filter(
+      (expense) =>
+        expense.payerId === payer.id ||
+        (expense.payerId === null &&
+          expense.payer.toLocaleLowerCase("it-IT") ===
+            payer.name.toLocaleLowerCase("it-IT")),
+    );
+  }
 
   const totalExpenses = expenses.reduce(
     (total, expense) => total + expense.amountCents,
-    0
-  )
+    0,
+  );
 
-  const totalAntonio = antonioExpenses.reduce(
-    (total, expense) => total + expense.amountCents,
-    0
-  )
-
-  const totalMarta = martaExpenses.reduce(
-    (total, expense) => total + expense.amountCents,
-    0
-  )
-
-  // ==========================================
-  // INTERFACCIA REACT
-  // ==========================================
+  // ========================================
+  // INTERFACCIA
+  // ========================================
 
   return (
     <main className="dashboard">
+      {/* HEADER */}
+
       <header className="dashboard-header">
         <div>
           <span className="subtitle">PERSONAL FINANCE</span>
+
           <h1>ExpenseFlow</h1>
+
           <p>Monitora e gestisci le tue spese quotidiane.</p>
         </div>
       </header>
 
-      {/* Riepilogo */}
+      {/* RIEPILOGO DINAMICO */}
+
       <section className="stats">
         <div className="stat-card">
           <p>Totale complessivo</p>
+
           <h2>{formatCurrency(totalExpenses)}</h2>
         </div>
 
-        <div className="stat-card">
-          <p>Totale Antonio</p>
-          <h2>{formatCurrency(totalAntonio)}</h2>
-        </div>
+        {payers.map((payer) => {
+          const payerExpenses = getPayerExpenses(payer);
 
-        <div className="stat-card">
-          <p>Totale Marta</p>
-          <h2>{formatCurrency(totalMarta)}</h2>
-        </div>
+          const total = payerExpenses.reduce(
+            (sum, expense) => sum + expense.amountCents,
+            0,
+          );
+
+          return (
+            <div className="stat-card" key={payer.id}>
+              <p>Totale {payer.name}</p>
+
+              <h2>{formatCurrency(total)}</h2>
+            </div>
+          );
+        })}
       </section>
 
-      {/* Modulo */}
+      {/* GESTIONE PAGATORI */}
+
+      <section className="add-expense-section">
+        <h2>I tuoi pagatori</h2>
+
+        <p>Aggiungi le persone di cui vuoi monitorare le spese.</p>
+
+        <form onSubmit={handleAddPayer}>
+  <div className="form-grid">
+    <div className="form-field">
+      <label htmlFor="newPayerName">
+        Nome del nuovo pagatore
+      </label>
+
+      <input
+        id="newPayerName"
+        type="text"
+        placeholder="Es. Luca, Sofia, Giovanni..."
+        value={newPayerName}
+        onChange={(event) =>
+          setNewPayerName(event.target.value)
+        }
+        maxLength={100}
+        required
+      />
+    </div>
+  </div>
+
+  {payerError && (
+    <p className="error-message" role="alert">
+      {payerError}
+    </p>
+  )}
+
+  {payerSuccess && (
+    <p className="success-message" role="status">
+      Pagatore aggiunto correttamente!
+    </p>
+  )}
+
+  <button
+    type="submit"
+    className="submit-button"
+    disabled={addingPayer}
+  >
+    {addingPayer
+      ? 'Salvataggio...'
+      : 'Aggiungi pagatore'}
+  </button>
+</form>
+
+        {!loading &&
+          !error &&
+          (payers.length === 0 ? (
+            <p>Non hai ancora aggiunto pagatori.</p>
+          ) : (
+            <ul className="payer-list">
+              {payers.map((payer) => (
+                <li className="payer-chip" key={payer.id}>
+                  {payer.name}
+                </li>
+              ))}
+            </ul>
+          ))}
+      </section>
+
+      {/* NUOVA SPESA */}
+
       <section className="add-expense-section">
         <h2>Aggiungi una spesa</h2>
+
         <p>Registra una nuova operazione.</p>
 
         <form onSubmit={handleAddExpense}>
           <div className="form-grid">
             <div className="form-field">
               <label htmlFor="amount">Importo (€)</label>
+
               <input
                 id="amount"
                 type="text"
                 inputMode="decimal"
                 placeholder="Es. 12,50"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(event) => setAmount(event.target.value)}
                 required
               />
             </div>
 
             <div className="form-field">
               <label htmlFor="category">Categoria</label>
+
               <select
                 id="category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(event) => setCategory(event.target.value)}
               >
                 <option value="Alimentari">Alimentari</option>
+
                 <option value="Trasporti">Trasporti</option>
+
                 <option value="Casa">Casa</option>
+
                 <option value="Salute">Salute</option>
+
                 <option value="Svago">Svago</option>
+
                 <option value="Altro">Altro</option>
               </select>
             </div>
 
             <div className="form-field">
               <label htmlFor="description">Descrizione</label>
+
               <input
                 id="description"
                 type="text"
                 placeholder="Es. Pranzo al ristorante"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(event) => setDescription(event.target.value)}
                 maxLength={500}
               />
             </div>
 
             <div className="form-field">
               <label htmlFor="expenseDate">Data</label>
+
               <input
                 id="expenseDate"
                 type="date"
                 value={expenseDate}
-                onChange={(e) => setExpenseDate(e.target.value)}
+                onChange={(event) => setExpenseDate(event.target.value)}
                 required
               />
             </div>
 
-            {/* Nuovo campo pagatore */}
+            {/* PAGATORE LIBERO */}
+
             <div className="form-field">
-              <label htmlFor="payer">Chi ha pagato?</label>
-              <select
-                id="payer"
-                value={payer}
-                onChange={(e) =>
-                  setPayer(e.target.value as Payer)
-                }
-              >
-                <option value="Antonio">Antonio</option>
-                <option value="Marta">Marta</option>
-              </select>
-            </div>
+  <label htmlFor="payer">
+    Chi ha pagato?
+  </label>
+
+  <select
+    id="payer"
+    value={payerId}
+    onChange={(event) =>
+      setPayerId(event.target.value)
+    }
+    disabled={payers.length === 0}
+    required
+  >
+    <option value="" disabled>
+      Seleziona un pagatore
+    </option>
+
+    {payers.map((payer) => (
+      <option
+        key={payer.id}
+        value={payer.id}
+      >
+        {payer.name}
+      </option>
+    ))}
+  </select>
+</div>
           </div>
 
           {saveError && (
@@ -501,17 +741,16 @@ function App() {
           <button
             type="submit"
             className="submit-button"
-            disabled={saving}
+            disabled={saving || payers.length === 0}
           >
-            {saving ? 'Salvataggio...' : 'Aggiungi spesa'}
+            {saving ? "Salvataggio..." : "Aggiungi spesa"}
           </button>
         </form>
       </section>
 
-      {/* Errori */}
-      {loading && (
-        <p role="status">Caricamento delle spese...</p>
-      )}
+      {/* MESSAGGI */}
+
+      {loading && <p role="status">Caricamento dei dati...</p>}
 
       {error && (
         <p className="error-message" role="alert">
@@ -525,26 +764,31 @@ function App() {
         </p>
       )}
 
-      {/* Le due tabelle */}
+      {/* TABELLE DINAMICHE */}
+
       {!loading && !error && (
         <>
-          <ExpenseTable
-            payer="Antonio"
-            expenses={antonioExpenses}
-            deletingId={deletingId}
-            onDelete={handleDeleteExpense}
-          />
+          {payers.length === 0 ? (
+            <section className="expenses-section">
+              <h2>Le tue spese</h2>
 
-          <ExpenseTable
-            payer="Marta"
-            expenses={martaExpenses}
-            deletingId={deletingId}
-            onDelete={handleDeleteExpense}
-          />
+              <p>Aggiungi un pagatore per iniziare a monitorare le spese.</p>
+            </section>
+          ) : (
+            payers.map((payer) => (
+              <ExpenseTable
+                key={payer.id}
+                payer={payer}
+                expenses={getPayerExpenses(payer)}
+                deletingId={deletingId}
+                onDelete={handleDeleteExpense}
+              />
+            ))
+          )}
         </>
       )}
     </main>
-  )
+  );
 }
 
-export default App
+export default App;
