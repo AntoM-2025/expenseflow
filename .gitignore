@@ -1,13 +1,17 @@
-# Variabili d'ambiente e credenziali
+# Environment variables
+.git
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+.env.neon
 
-# Dipendenze
+# Dependencies
 node_modules/
 **/node_modules/
 
-# File generati
+# Generated files
 dist/
 **/dist/
 
@@ -16,3 +20,9 @@ dist/
 
 # macOS
 .DS_Store
+
+# Backend build
+server/dist/
+
+# Frontend build
+client/dist/

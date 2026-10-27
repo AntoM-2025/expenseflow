@@ -1,0 +1,25 @@
+# Git
+.git
+
+# Node dependencies
+**/node_modules
+
+# Build generate localmente
+**/dist
+
+# Variabili d'ambiente
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Log
+**/*.log
+
+# File macOS
+.DS_Store
+**/.DS_Store
+
+# File editor
+.vscode
+.idea
