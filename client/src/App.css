@@ -267,3 +267,45 @@ td {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================
+   RIEPILOGO DINAMICO
+========================================== */
+
+.stats {
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(220px, 1fr)
+  );
+}
+
+/* ==========================================
+   ELENCO PAGATORI
+========================================== */
+
+.payer-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  padding: 0;
+  margin: 20px 0 0;
+
+  list-style: none;
+}
+
+.payer-chip {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 10px 16px;
+
+  border: 1px solid #dbe3ef;
+  border-radius: 999px;
+
+  background: #f1f5f9;
+  color: #334155;
+
+  font-size: 14px;
+  font-weight: 600;
+}
