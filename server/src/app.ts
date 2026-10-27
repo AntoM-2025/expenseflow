@@ -1,19 +1,48 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import express from "express";
 import { z } from "zod";
-
 import { pool } from "./db/pool.ts";
 import { authRouter } from "./routes/auth.ts";
 import { payersRouter } from "./routes/payers.ts";
 import { requireAuth } from "./middleware/requireAuth.ts";
+import { requireTrustedOrigin } from "./middleware/requireTrustedOrigin.ts";
 
 // ==========================================
 // CONFIGURAZIONE EXPRESS
 // ==========================================
 
 const app = express();
+
+// ==========================================
+// CONFIGURAZIONE PROXY RENDER
+// ==========================================
+
+if (process.env.RENDER === "true") {
+  const proxyHops = Number(
+    process.env.TRUST_PROXY_HOPS ?? "1"
+  );
+
+  if (
+    !Number.isInteger(proxyHops) ||
+    proxyHops < 1 ||
+    proxyHops > 3
+  ) {
+    throw new Error(
+      "TRUST_PROXY_HOPS non valido"
+    );
+  }
+
+  app.set("trust proxy", proxyHops);
+}
+
+
 const PORT = Number(process.env.PORT ?? 3000);
 
 app.use(express.json());
+
+app.use("/api", requireTrustedOrigin);
 
 // ==========================================
 // AUTENTICAZIONE E PAGATORI
@@ -94,6 +123,17 @@ function mapExpense(row: ExpenseRow) {
     createdAt: row.created_at,
   };
 }
+
+// ==========================================
+// HEALTH CHECK RENDER
+// ==========================================
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "expenseflow",
+  });
+});
 
 // ==========================================
 // GET /api/health
@@ -357,6 +397,57 @@ app.delete("/api/expenses/:id", async (req, res) => {
     });
   }
 });
+
+// ==========================================
+// FRONTEND REACT
+// ==========================================
+
+// Directory del file attualmente in esecuzione
+const currentDir = path.dirname(
+  fileURLToPath(import.meta.url)
+);
+
+// Percorso della build React
+const clientDistPath = path.resolve(
+  currentDir,
+  "../../client/dist"
+);
+
+// File principale React
+const indexHtmlPath = path.join(
+  clientDistPath,
+  "index.html"
+);
+
+// Controlliamo che React sia stato compilato
+if (existsSync(indexHtmlPath)) {
+
+  // Serviamo CSS, JavaScript e altri asset
+  app.use(express.static(clientDistPath));
+
+  // Gestiamo le rotte React
+  app.get("/{*splat}", (req, res, next) => {
+
+    // Le richieste API devono restare al backend
+    if (
+      req.path === "/api" ||
+      req.path.startsWith("/api/")
+    ) {
+      next();
+      return;
+    }
+
+    // Restituiamo la dashboard React
+    res.sendFile(indexHtmlPath);
+  });
+
+} else if (process.env.NODE_ENV === "production") {
+
+  // In produzione React deve essere disponibile
+  throw new Error(
+    `Build React non trovata: ${indexHtmlPath}`
+  );
+}
 
 // ==========================================
 // AVVIO SERVER
