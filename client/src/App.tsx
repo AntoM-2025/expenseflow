@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 
 import "./App.css";
 import MonthlyChart from "./MonthlyChart";
+import { loadSection } from "./loadSection";
 
 // ==========================================
 // TYPESCRIPT TYPES
@@ -32,6 +33,7 @@ type ExpenseTableProps = {
   expenses: Expense[];
   deletingId: string | null;
   onDelete: (expense: Expense) => Promise<void>;
+  complete: boolean;
 };
 
 // ==========================================
@@ -96,6 +98,7 @@ function ExpenseTable({
   expenses,
   deletingId,
   onDelete,
+  complete,
 }: ExpenseTableProps) {
   const subtotal = expenses.reduce(
     (total, expense) => total + (expense.kind === "income" ? expense.amountCents : -expense.amountCents),
@@ -108,12 +111,12 @@ function ExpenseTable({
         <h2><span className="avatar" aria-hidden="true">{payer.name.slice(0, 1).toUpperCase()}</span>{payer.name}</h2>
 
         <span>
-          {expenses.length} movements · Balance {formatCurrency(subtotal)}
+          {expenses.length} movements · {complete ? `Balance ${formatCurrency(subtotal)}` : "Partial data — balance unavailable"}
         </span>
       </div>
 
       {expenses.length === 0 ? (
-        <p className="empty-state">No movements yet. The next transaction for {payer.name} will appear here.</p>
+        <p className="empty-state">{complete ? `No movements yet. The next transaction for ${payer.name} will appear here.` : "Some transactions are unavailable."}</p>
       ) : (
         <div className="table-container">
           <table>
@@ -193,8 +196,13 @@ function App() {
   const [movementType, setMovementType] = useState<"expense" | "income">("expense");
   const [deletingPayerId, setDeletingPayerId] = useState<string | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingSections, setLoadingSections] = useState({ expenses: true, payers: true, incomes: true });
+  const [loadErrors, setLoadErrors] = useState<Record<"expenses" | "payers" | "incomes", string | null>>({ expenses: null, payers: null, incomes: null });
+  const loading = Object.values(loadingSections).some(Boolean);
+  const expensesReady = !loadingSections.expenses && !loadErrors.expenses;
+  const incomesReady = !loadingSections.incomes && !loadErrors.incomes;
+  const payersReady = !loadingSections.payers && !loadErrors.payers;
+  const movementsReady = expensesReady && incomesReady;
 
   // ========================================
   // NEW PAYER
@@ -245,56 +253,15 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadData() {
-      try {
-        const [payersResponse, expensesResponse, incomesResponse] = await Promise.all([
-          fetch("/api/payers", {
-            signal: controller.signal,
-          }),
-
-          fetch("/api/expenses", {
-            signal: controller.signal,
-          }),
-          fetch("/api/incomes", { signal: controller.signal }),
-        ]);
-
-        if (!payersResponse.ok) {
-          throw new Error("Unable to retrieve payers");
-        }
-
-        if (!expensesResponse.ok) {
-          throw new Error("Unable to retrieve expenses");
-        }
-
-        if (!incomesResponse.ok) throw new Error("Unable to retrieve incomes");
-
-        const [payersData, expensesData, incomesData] = await Promise.all([
-          payersResponse.json() as Promise<Payer[]>,
-          expensesResponse.json() as Promise<Expense[]>,
-          incomesResponse.json() as Promise<Income[]>,
-        ]);
-
-        if (!controller.signal.aborted) {
-          setPayers(payersData.sort(sortPayers));
-          setExpenses(expensesData);
-          setIncomes(incomesData.map(item => ({ ...item, expenseDate: item.incomeDate, kind: "income" })));
-        }
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Error loading data",
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
+    function load<T>(section: "expenses" | "payers" | "incomes", onData: (data: T[]) => void) {
+      void loadSection<T>(section, controller.signal, onData,
+        message => setLoadErrors(current => ({ ...current, [section]: message })),
+        () => setLoadingSections(current => ({ ...current, [section]: false })),
+      );
     }
-
-    void loadData();
+    load<Payer>("payers", data => setPayers(data.sort(sortPayers)));
+    load<Expense>("expenses", setExpenses);
+    load<Income>("incomes", data => setIncomes(data.map(item => ({ ...item, expenseDate: item.incomeDate, kind: "income" }))));
 
     return () => controller.abort();
   }, []);
@@ -525,6 +492,15 @@ function App() {
   const totalIncome = incomes.reduce((sum, item) => sum + item.amountCents, 0);
   const movements = [...expenses, ...incomes].sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
 
+  // API movement rows include payer names, so transactions remain visible even
+  // when the payer endpoint is unavailable.
+  const displayPayers = [...payers];
+  for (const item of movements) {
+    if (item.payerId && !displayPayers.some(payer => payer.id === item.payerId)) {
+      displayPayers.push({ id: item.payerId, name: item.payer });
+    }
+  }
+
   // ========================================
   // USER INTERFACE
   // ========================================
@@ -549,22 +525,22 @@ function App() {
       <section className="stats">
         <div className="stat-card stat-card-total">
           <p><span className="stat-symbol" aria-hidden="true">€</span>Total expenses</p>
-          <h2>{loading ? "—" : error ? "Unavailable" : formatCurrency(totalExpenses)}</h2>
+          <h2>{expensesReady ? formatCurrency(totalExpenses) : "Unavailable"}</h2>
           <span className="stat-caption">All recorded transactions</span>
         </div>
         <div className="stat-card">
           <p><span className="stat-symbol" aria-hidden="true">↗</span>Total income</p>
-          <h2>{loading || error ? "—" : formatCurrency(totalIncome)}</h2>
+          <h2>{!incomesReady ? "—" : formatCurrency(totalIncome)}</h2>
           <span className="stat-caption">All recorded income</span>
         </div>
         <div className="stat-card">
           <p><span className="stat-symbol" aria-hidden="true">◎</span>Balance</p>
-          <h2>{loading || error ? "—" : formatCurrency(totalIncome - totalExpenses)}</h2>
+          <h2>{!movementsReady ? "—" : formatCurrency(totalIncome - totalExpenses)}</h2>
           <span className="stat-caption">Income minus expenses</span>
         </div>
       </section>
 
-      {payers.length > 0 && <section className="payer-summaries" aria-label="Totals by payer">
+      {movementsReady && payers.length > 0 && <section className="payer-summaries" aria-label="Totals by payer">
 
         {payers.map((payer) => {
           const payerExpenses = getPayerExpenses(payer);
@@ -585,7 +561,7 @@ function App() {
         })}
       </section>}
 
-      {!loading && !error && <MonthlyChart movements={movements} payers={payers} />}
+      {movementsReady && <MonthlyChart movements={movements} payers={displayPayers} />}
 
       <div className="entry-layout">
       {/* PAYER MANAGEMENT */}
@@ -632,7 +608,7 @@ function App() {
   <button
     type="submit"
     className="submit-button"
-    disabled={addingPayer || deletingPayerId !== null || loading || !!error}
+    disabled={addingPayer || deletingPayerId !== null || !payersReady}
   >
     {addingPayer
       ? 'Saving...'
@@ -640,8 +616,7 @@ function App() {
   </button>
 </form>
 
-        {!loading &&
-          !error &&
+        {payersReady &&
           (payers.length === 0 ? (
             <p>You have not added any payers yet.</p>
           ) : (
@@ -801,7 +776,7 @@ function App() {
           <button
             type="submit"
             className="submit-button"
-            disabled={saving || payers.length === 0 || deletingPayerId !== null || loading || !!error}
+            disabled={saving || payers.length === 0 || deletingPayerId !== null || !payersReady || !(movementType === "income" ? incomesReady : expensesReady)}
           >
             {saving ? "Saving..." : movementType === "income" ? "Add income" : "Add expense"}
           </button>
@@ -816,11 +791,10 @@ function App() {
 
       {loading && <p role="status">Loading data...</p>}
 
-      {error && (
-        <p className="error-message" role="alert">
-          {error}
-        </p>
-      )}
+      {Object.entries(loadErrors).map(([section, message]) => message && (
+        <p key={section} className="error-message" role="alert">{message}</p>
+      ))}
+      {!movementsReady && <p role="status">Transactions may be incomplete. Balances and charts are unavailable until expenses and income have loaded.</p>}
 
       {deleteError && (
         <p className="error-message" role="alert">
@@ -830,21 +804,22 @@ function App() {
 
       {/* DYNAMIC TABLES */}
 
-      {!loading && !error && (
+      {(expensesReady || incomesReady) && (
         <>
-          {payers.length === 0 ? (
+          {displayPayers.length === 0 ? (
             <section className="expenses-section">
               <h2>Your expenses</h2>
 
-              <p>Add a payer to start tracking expenses.</p>
+              <p>{payersReady && movementsReady ? "Add a payer to start tracking expenses." : "Some data is unavailable. Reload to retry."}</p>
             </section>
           ) : (
-            payers.map((payer) => (
+            displayPayers.map((payer) => (
               <ExpenseTable
                 key={payer.id}
                 payer={payer}
                 expenses={movements.filter(item => item.payerId === payer.id)}
                 deletingId={deletingPayerId ?? deletingId}
+                complete={movementsReady}
                 onDelete={handleDeleteExpense}
               />
             ))

@@ -1,4 +1,5 @@
-// Uses a uniquely named disposable database; never migrates the configured database.
+// Uses a uniquely named local test database; never migrates the configured database.
+// Retains it for inspection; never drops a database automatically.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -9,6 +10,10 @@ const config = process.env.DATABASE_URL ? { connectionString: process.env.DATABA
   host: process.env.POSTGRES_HOST ?? '127.0.0.1', port: Number(process.env.POSTGRES_PORT ?? 5433),
   user: process.env.POSTGRES_USER, password: process.env.POSTGRES_PASSWORD, database: process.env.POSTGRES_DB,
 };
+const host = config.connectionString ? new URL(config.connectionString).hostname : config.host;
+if (!['127.0.0.1', 'localhost', '::1'].includes(host) || process.env.NODE_ENV === 'production') {
+  throw new Error('Integration tests require a local database');
+}
 const admin = new pg.Client(config);
 const database = `expenseflow_test_${randomBytes(6).toString('hex')}`;
 let app;
@@ -45,9 +50,11 @@ try {
     const response = await request('/auth/login', { method: 'POST', body: { username, password: 'test-password-123' } });
     return response.headers.get('set-cookie').split(';')[0];
   }
-  await request('/incomes', { status: 401 });
+  for (const endpoint of ['/incomes', '/expenses', '/payers', '/auth/me']) await request(endpoint, { status: 401 });
+  await request('/unknown', { status: 404 });
   const alice = await account('test_alice');
   const bob = await account('test_bob');
+  await request('/auth/me', { cookie: alice });
   const payer = await (await request('/payers', { method: 'POST', cookie: alice, status: 201, body: { name: 'Alice payer' } })).json();
   const incomeBody = { payerId: payer.id, amountCents: 123456, category: 'Salary', incomeDate: '2026-01-31' };
   await request('/incomes', { method: 'POST', cookie: bob, status: 404, body: incomeBody });
@@ -65,6 +72,9 @@ try {
   await request(`/incomes/${income.id}`, { method: 'DELETE', cookie: alice, status: 204 });
   await request('/incomes', { method: 'POST', cookie: alice, status: 201, body: incomeBody });
   await request('/expenses', { method: 'POST', cookie: alice, status: 201, body: { payerId: payer.id, amountCents: 1234, category: 'Groceries', expenseDate: '2026-01-31' } });
+  assert.equal((await (await request('/expenses', { cookie: alice })).json()).length, 1);
+  assert.deepEqual(await (await request('/expenses', { cookie: bob })).json(), []);
+  assert.deepEqual(await (await request('/payers', { cookie: bob })).json(), []);
   await request(`/payers/${payer.id}`, { method: 'DELETE', cookie: alice, status: 204 });
   for (const path of ['/payers', '/incomes', '/expenses']) assert.deepEqual(await (await request(path, { cookie: alice })).json(), []);
   await request(`/payers/${payer.id}`, { method: 'DELETE', cookie: alice, status: 404 });
@@ -73,6 +83,6 @@ try {
   console.log('PASS: migrations, income validation and CRUD, account isolation, payer deletion with and without movements.');
 } finally {
   if (app && app.exitCode === null) { app.kill(); await once(app, 'exit'); }
-  if (created) await admin.query(`DROP DATABASE "${database}" WITH (FORCE)`);
+  if (created) console.log(`Retained isolated test database: ${database} (manual cleanup only).`);
   await admin.end();
 }

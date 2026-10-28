@@ -74,6 +74,8 @@ COPY --from=server-build --chown=node:node \
 COPY --from=client-build --chown=node:node \
   /app/client/dist /app/client/dist
 
+COPY --chown=node:node database/migrations/ /app/database/migrations/
+
 # Esecuzione senza privilegi root
 USER node
 
