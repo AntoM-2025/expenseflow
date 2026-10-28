@@ -10,13 +10,13 @@ import { requireAuth } from "./middleware/requireAuth.ts";
 import { requireTrustedOrigin } from "./middleware/requireTrustedOrigin.ts";
 
 // ==========================================
-// CONFIGURAZIONE EXPRESS
+// EXPRESS CONFIGURATION
 // ==========================================
 
 const app = express();
 
 // ==========================================
-// CONFIGURAZIONE PROXY RENDER
+// RENDER PROXY CONFIGURATION
 // ==========================================
 
 if (process.env.RENDER === "true") {
@@ -30,7 +30,7 @@ if (process.env.RENDER === "true") {
     proxyHops > 3
   ) {
     throw new Error(
-      "TRUST_PROXY_HOPS non valido"
+      "Invalid TRUST_PROXY_HOPS"
     );
   }
 
@@ -45,7 +45,7 @@ app.use(express.json());
 app.use("/api", requireTrustedOrigin);
 
 // ==========================================
-// AUTENTICAZIONE E PAGATORI
+// AUTHENTICATION AND PAYERS
 // ==========================================
 
 app.use("/api/auth", authRouter);
@@ -53,7 +53,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/payers", requireAuth, payersRouter);
 
 // ==========================================
-// TIPI TYPESCRIPT
+// TYPESCRIPT TYPES
 // ==========================================
 
 type ExpenseRow = {
@@ -75,7 +75,7 @@ type PayerRow = {
 };
 
 // ==========================================
-// VALIDAZIONE SPESE
+// EXPENSE VALIDATION
 // ==========================================
 
 const expenseSchema = z.object({
@@ -102,13 +102,13 @@ const expenseSchema = z.object({
   payerId: z
     .string()
     .regex(/^[1-9]\d*$/, {
-      message: "ID pagatore non valido",
+      message: "Invalid payer ID",
     })
     .max(19),
 });
 
 // ==========================================
-// FUNZIONE DI CONVERSIONE SPESA
+// EXPENSE CONVERSION FUNCTION
 // ==========================================
 
 function mapExpense(row: ExpenseRow) {
@@ -149,17 +149,17 @@ app.get("/api/health", async (_req, res) => {
       database: "connected",
     });
   } catch (error) {
-    console.error("Errore database:", error);
+    console.error("Database error:", error);
 
     res.status(503).json({
       status: "error",
-      message: "Database non disponibile",
+      message: "Database unavailable",
     });
   }
 });
 
 // ==========================================
-// PROTEZIONE API SPESE
+// EXPENSE API PROTECTION
 // ==========================================
 
 app.use("/api/expenses", requireAuth);
@@ -173,7 +173,7 @@ app.get("/api/expenses", async (req, res) => {
 
   if (!userId) {
     res.status(401).json({
-      error: "Autenticazione richiesta",
+      error: "Authentication required",
     });
 
     return;
@@ -204,19 +204,19 @@ type ExpenseInsertRow = Omit<ExpenseRow, "payer">;
     );
   } catch (error) {
     console.error(
-      "Errore recupero spese:",
+      "Error retrieving expenses:",
       error
     );
 
     res.status(500).json({
-      error: "Impossibile recuperare le spese",
+      error: "Unable to retrieve expenses",
     });
   }
 });
 
 // ==========================================
 // POST /api/expenses
-// Inserimento nuova spesa
+// Insert a new expense
 // ==========================================
 
 app.post("/api/expenses", async (req, res) => {
@@ -224,20 +224,20 @@ app.post("/api/expenses", async (req, res) => {
 
   if (!userId) {
     res.status(401).json({
-      error: "Autenticazione richiesta",
+      error: "Authentication required",
     });
 
     return;
   }
 
-  // 1. Validazione dati
+  // 1. Validate data
   const validation = expenseSchema.safeParse(
     req.body
   );
 
   if (!validation.success) {
     res.status(400).json({
-      error: "Dati della spesa non validi",
+      error: "Invalid expense data",
       details: validation.error.issues,
     });
 
@@ -253,8 +253,8 @@ app.post("/api/expenses", async (req, res) => {
   } = validation.data;
 
   try {
-    // 2. Verifichiamo che il pagatore
-    // appartenga all'utente autenticato.
+    // 2. Verify that the payer
+    // belongs to the authenticated user.
 
     const payerResult = await pool.query<{
       id: string;
@@ -273,14 +273,14 @@ app.post("/api/expenses", async (req, res) => {
 
     if (!payer) {
       res.status(404).json({
-        error: "Pagatore non trovato",
+        error: "Payer not found",
       });
 
       return;
     }
 
-    // 3. Inseriamo la spesa.
-    // Non utilizziamo più la colonna payer.
+    // 3. Insert the expense.
+    // The payer column is no longer used.
 
     const result = await pool.query<ExpenseInsertRow>(
       `INSERT INTO expenses (
@@ -314,12 +314,12 @@ app.post("/api/expenses", async (req, res) => {
 
     if (!expense) {
       throw new Error(
-        "Nessuna spesa restituita dal database"
+        "No expense returned by the database"
       );
     }
 
-    // 4. Restituiamo la spesa
-    // insieme al nome del pagatore.
+    // 4. Return the expense
+    // along with the payer name.
 
     res.status(201).json(
       mapExpense({
@@ -329,12 +329,12 @@ app.post("/api/expenses", async (req, res) => {
     );
   } catch (error) {
     console.error(
-      "Errore salvataggio spesa:",
+      "Error saving expense:",
       error
     );
 
     res.status(500).json({
-      error: "Impossibile salvare la spesa",
+      error: "Unable to save the expense",
     });
   }
 });
@@ -349,7 +349,7 @@ app.delete("/api/expenses/:id", async (req, res) => {
 
   if (!userId) {
     res.status(401).json({
-      error: "Autenticazione richiesta",
+      error: "Authentication required",
     });
 
     return;
@@ -360,7 +360,7 @@ app.delete("/api/expenses/:id", async (req, res) => {
     !/^[1-9]\d*$/.test(id)
   ) {
     res.status(400).json({
-      error: "ID della spesa non valido",
+      error: "Invalid expense ID",
     });
 
     return;
@@ -379,7 +379,7 @@ app.delete("/api/expenses/:id", async (req, res) => {
 
     if (result.rowCount === 0) {
       res.status(404).json({
-        error: "Spesa non trovata",
+        error: "Expense not found",
       });
 
       return;
@@ -388,12 +388,12 @@ app.delete("/api/expenses/:id", async (req, res) => {
     res.status(204).send();
   } catch (error) {
     console.error(
-      "Errore eliminazione spesa:",
+      "Error deleting expense:",
       error
     );
 
     res.status(500).json({
-      error: "Impossibile eliminare la spesa",
+      error: "Unable to delete the expense",
     });
   }
 });
@@ -402,33 +402,33 @@ app.delete("/api/expenses/:id", async (req, res) => {
 // FRONTEND REACT
 // ==========================================
 
-// Directory del file attualmente in esecuzione
+// Directory of the currently running file
 const currentDir = path.dirname(
   fileURLToPath(import.meta.url)
 );
 
-// Percorso della build React
+// React build path
 const clientDistPath = path.resolve(
   currentDir,
   "../../client/dist"
 );
 
-// File principale React
+// React entry file
 const indexHtmlPath = path.join(
   clientDistPath,
   "index.html"
 );
 
-// Controlliamo che React sia stato compilato
+// Check that React has been built
 if (existsSync(indexHtmlPath)) {
 
-  // Serviamo CSS, JavaScript e altri asset
+  // Serve CSS, JavaScript, and other assets
   app.use(express.static(clientDistPath));
 
-  // Gestiamo le rotte React
+  // Handle React routes
   app.get("/{*splat}", (req, res, next) => {
 
-    // Le richieste API devono restare al backend
+    // API requests must stay on the backend
     if (
       req.path === "/api" ||
       req.path.startsWith("/api/")
@@ -437,24 +437,24 @@ if (existsSync(indexHtmlPath)) {
       return;
     }
 
-    // Restituiamo la dashboard React
+    // Return the React dashboard
     res.sendFile(indexHtmlPath);
   });
 
 } else if (process.env.NODE_ENV === "production") {
 
-  // In produzione React deve essere disponibile
+  // React must be available in production
   throw new Error(
-    `Build React non trovata: ${indexHtmlPath}`
+    `React build not found: ${indexHtmlPath}`
   );
 }
 
 // ==========================================
-// AVVIO SERVER
+// SERVER STARTUP
 // ==========================================
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(
-    `ExpenseFlow API avviata sulla porta ${PORT}`
+    `ExpenseFlow API started on port ${PORT}`
   );
 });

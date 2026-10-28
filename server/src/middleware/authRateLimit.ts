@@ -1,7 +1,7 @@
 import { rateLimit } from "express-rate-limit";
 
 // ==========================================
-// PROTEZIONE LOGIN
+// LOGIN PROTECTION
 // ==========================================
 
 export const loginRateLimiter = rateLimit({
@@ -12,17 +12,17 @@ export const loginRateLimiter = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
 
-  // I login riusciti non consumano tentativi
+  // Successful logins do not count toward the limit
   skipSuccessfulRequests: true,
 
   message: {
     error:
-      "Troppi tentativi di accesso. Riprova tra 15 minuti.",
+      "Too many login attempts. Try again in 15 minutes.",
   },
 });
 
 // ==========================================
-// PROTEZIONE REGISTRAZIONE
+// REGISTRATION PROTECTION
 // ==========================================
 
 export const registerRateLimiter = rateLimit({
@@ -35,6 +35,6 @@ export const registerRateLimiter = rateLimit({
 
   message: {
     error:
-      "Troppe richieste di registrazione. Riprova più tardi.",
+      "Too many registration requests. Try again later.",
   },
 });

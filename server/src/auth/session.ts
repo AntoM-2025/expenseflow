@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { parseCookie } from "cookie";
 
 // ==========================================
-// CONFIGURAZIONE SESSIONI
+// SESSION CONFIGURATION
 // ==========================================
 
 export const SESSION_COOKIE_NAME = "expenseflow_session";
@@ -19,7 +19,7 @@ export const sessionCookieOptions = {
 };
 
 // ==========================================
-// HASH DEL TOKEN
+// TOKEN HASH
 // ==========================================
 
 export function hashSessionToken(token: string): string {
@@ -29,7 +29,7 @@ export function hashSessionToken(token: string): string {
 }
 
 // ==========================================
-// LETTURA COOKIE
+// READ COOKIE
 // ==========================================
 
 export function getSessionToken(

@@ -19,13 +19,13 @@ import {
 } from "../middleware/authRateLimit.ts";
 
 // ==========================================
-// CONFIGURAZIONE ROUTER
+// ROUTER CONFIGURATION
 // ==========================================
 
 export const authRouter = Router();
 
 // ==========================================
-// TIPI TYPESCRIPT
+// TYPESCRIPT TYPES
 // ==========================================
 
 type UserRow = {
@@ -46,7 +46,7 @@ type LoginUserRow = {
 };
 
 // ==========================================
-// VALIDAZIONE REGISTRAZIONE
+// REGISTRATION VALIDATION
 // ==========================================
 
 const registerSchema = z.object({
@@ -58,7 +58,7 @@ const registerSchema = z.object({
     .toLowerCase()
     .regex(/^[a-z0-9_]{3,30}$/, {
       message:
-        "Lo username deve contenere 3-30 caratteri: lettere minuscole, numeri o underscore",
+        "Username must contain 3–30 characters: lowercase letters, numbers, or underscores",
     }),
 
   email: z
@@ -73,7 +73,7 @@ const registerSchema = z.object({
 });
 
 // ==========================================
-// VALIDAZIONE LOGIN
+// LOGIN VALIDATION
 // ==========================================
 
 const loginSchema = z.object({
@@ -83,7 +83,7 @@ const loginSchema = z.object({
 
 // ==========================================
 // POST /api/auth/register
-// Registrazione nuovo utente
+// Register a new user
 // ==========================================
 
 authRouter.post(
@@ -94,7 +94,7 @@ authRouter.post(
 
   if (!validation.success) {
     res.status(400).json({
-      error: "Dati di registrazione non validi",
+      error: "Invalid registration data",
       details: validation.error.issues.map((issue) => ({
         field: issue.path.join("."),
         message: issue.message,
@@ -108,7 +108,7 @@ authRouter.post(
     validation.data;
 
   try {
-    // 1. Generazione hash della password
+    // 1. Generate the password hash
     const passwordHash = await argon2.hash(password, {
       type: argon2.argon2id,
       memoryCost: 19456,
@@ -116,7 +116,7 @@ authRouter.post(
       parallelism: 1,
     });
 
-    // 2. Inserimento utente nel database
+    // 2. Insert the user into the database
     const result = await pool.query<UserRow>(
       `INSERT INTO users (
         name,
@@ -138,13 +138,13 @@ authRouter.post(
 
     if (!user) {
       throw new Error(
-        "Nessun utente restituito dal database"
+        "No user returned by the database"
       );
     }
 
-    // 3. Risposta senza password o hash
+    // 3. Respond without the password or hash
     res.status(201).json({
-      message: "Registrazione completata",
+      message: "Sign upon complete",
       user: {
         id: user.id,
         name: user.name,
@@ -154,7 +154,7 @@ authRouter.post(
       },
     });
   } catch (error: unknown) {
-    // PostgreSQL: violazione vincolo UNIQUE
+    // PostgreSQL: UNIQUE constraint violation
     if (
       typeof error === "object" &&
       error !== null &&
@@ -162,16 +162,16 @@ authRouter.post(
       error.code === "23505"
     ) {
       res.status(409).json({
-        error: "Username o email già utilizzati",
+        error: "Username or email already in use",
       });
 
       return;
     }
 
-    console.error("Errore registrazione:", error);
+    console.error("Sign upon error:", error);
 
     res.status(500).json({
-      error: "Impossibile completare la registrazione",
+      error: "Unable to complete registration",
     });
   }
 });
@@ -188,7 +188,7 @@ authRouter.post(
 
   if (!validation.success) {
     res.status(400).json({
-      error: "Dati di accesso non validi",
+      error: "Invalid login data",
     });
 
     return;
@@ -197,7 +197,7 @@ authRouter.post(
   const { username, password } = validation.data;
 
   try {
-    // 1. Recuperiamo l'utente dal database
+    // 1. Retrieve the user from the database
     const result = await pool.query<LoginUserRow>(
       `SELECT
         id::text,
@@ -215,13 +215,13 @@ authRouter.post(
 
     if (!user) {
       res.status(401).json({
-        error: "Username o password non validi",
+        error: "Invalid username or password",
       });
 
       return;
     }
 
-    // 2. Verifichiamo la password
+    // 2. Verify the password
     const validPassword = await argon2.verify(
       user.password_hash,
       password
@@ -229,16 +229,16 @@ authRouter.post(
 
     if (!validPassword) {
       res.status(401).json({
-        error: "Username o password non validi",
+        error: "Invalid username or password",
       });
 
       return;
     }
 
-    // 3. Generiamo un token casuale
+    // 3. Generate a random token
     const sessionToken = randomBytes(32).toString("hex");
 
-    // 4. Salviamo soltanto l'hash del token
+    // 4. Store only the token hash
     const tokenHash = hashSessionToken(sessionToken);
 
     const expiresAt = new Date(
@@ -255,15 +255,15 @@ authRouter.post(
       [user.id, tokenHash, expiresAt]
     );
 
-    // 5. Inviamo il cookie al browser
+    // 5. Send the cookie to the browser
     res.cookie(SESSION_COOKIE_NAME, sessionToken, {
       ...sessionCookieOptions,
       maxAge: SESSION_DURATION_MS,
     });
 
-    // 6. Restituiamo i dati pubblici dell'utente
+    // 6. Return the public user data
     res.status(200).json({
-      message: "Login effettuato",
+      message: "Logged in successfully",
       user: {
         id: user.id,
         name: user.name,
@@ -273,17 +273,17 @@ authRouter.post(
       },
     });
   } catch (error) {
-    console.error("Errore login:", error);
+    console.error("Login error:", error);
 
     res.status(500).json({
-      error: "Impossibile effettuare il login",
+      error: "Unable to log in",
     });
   }
 });
 
 // ==========================================
 // GET /api/auth/me
-// Recupero utente autenticato
+// Retrieve the authenticated user
 // ==========================================
 
 authRouter.get("/me", async (req, res) => {
@@ -291,7 +291,7 @@ authRouter.get("/me", async (req, res) => {
 
   if (!sessionToken) {
     res.status(401).json({
-      error: "Utente non autenticato",
+      error: "User not authenticated",
     });
 
     return;
@@ -322,7 +322,7 @@ authRouter.get("/me", async (req, res) => {
 
     if (!user) {
       res.status(401).json({
-        error: "Sessione non valida o scaduta",
+        error: "Invalid or expired session",
       });
 
       return;
@@ -332,17 +332,17 @@ authRouter.get("/me", async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error("Errore sessione:", error);
+    console.error("Session error:", error);
 
     res.status(500).json({
-      error: "Impossibile verificare la sessione",
+      error: "Unable to verify the session",
     });
   }
 });
 
 // ==========================================
 // POST /api/auth/logout
-// Chiusura della sessione
+// Close the session
 // ==========================================
 
 authRouter.post("/logout", async (req, res) => {
@@ -352,7 +352,7 @@ authRouter.post("/logout", async (req, res) => {
     if (sessionToken) {
       const tokenHash = hashSessionToken(sessionToken);
 
-      // Eliminiamo la sessione dal database
+      // Delete the session from the database
       await pool.query(
         `DELETE FROM user_sessions
          WHERE token_hash = $1`,
@@ -360,7 +360,7 @@ authRouter.post("/logout", async (req, res) => {
       );
     }
 
-    // Eliminiamo il cookie dal browser
+    // Delete the cookie from the browser
     res.clearCookie(
       SESSION_COOKIE_NAME,
       sessionCookieOptions
@@ -368,10 +368,10 @@ authRouter.post("/logout", async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error("Errore logout:", error);
+    console.error("Logout error:", error);
 
     res.status(500).json({
-      error: "Impossibile completare il logout",
+      error: "Unable to complete logout",
     });
   }
 });

@@ -7,7 +7,7 @@ import path from "node:path";
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  throw new Error("DATABASE_URL mancante");
+  throw new Error("Missing DATABASE_URL");
 }
 
 const migrationsDir = fileURLToPath(
@@ -22,8 +22,8 @@ async function migrate() {
   await client.connect();
 
   try {
-    // Evitiamo di applicare da zero le migrazioni
-    // su un database già popolato ma senza storico.
+    // Avoid applying migrations from scratch
+    // to a populated database without migration history.
     const state = await client.query<{
       history: string | null;
       expenses: string | null;
@@ -35,11 +35,11 @@ async function migrate() {
 
     if (state.rows[0]?.expenses && !state.rows[0]?.history) {
       throw new Error(
-        "Database già inizializzato senza storico migrazioni"
+        "Database already initialized without migration history"
       );
     }
 
-    // Registro delle migrazioni eseguite
+    // Record of applied migrations
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         filename TEXT PRIMARY KEY,
@@ -53,7 +53,7 @@ async function migrate() {
       .sort();
 
     if (files.length === 0) {
-      throw new Error("Nessuna migrazione trovata");
+      throw new Error("No migrations found");
     }
 
     for (const filename of files) {
@@ -78,7 +78,7 @@ async function migrate() {
       if (existing.rows[0]) {
         if (existing.rows[0].checksum !== checksum) {
           throw new Error(
-            `Migrazione già eseguita ma modificata: ${filename}`
+            `Previously applied migration has been modified: ${filename}`
           );
         }
 
@@ -86,9 +86,9 @@ async function migrate() {
         continue;
       }
 
-      // Alcuni script contengono BEGIN/COMMIT.
-      // Li gestiamo qui per includere anche
-      // il salvataggio nello storico.
+      // Some scripts contain BEGIN/COMMIT.
+      // Handle them here to also include
+      // saving the migration history.
       const sql = originalSql
         .split(/\r?\n/)
         .filter(
@@ -118,13 +118,13 @@ async function migrate() {
       }
     }
 
-    console.log("Migrazioni completate");
+    console.log("Migrations complete");
   } finally {
     await client.end();
   }
 }
 
 migrate().catch((error) => {
-  console.error("Errore durante le migrazioni:", error);
+  console.error("Error running migrations:", error);
   process.exitCode = 1;
 });
