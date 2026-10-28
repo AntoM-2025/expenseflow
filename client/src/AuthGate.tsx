@@ -216,24 +216,20 @@ function AuthGate() {
   if (user) {
     return (
       <>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-            gap: '16px',
-            padding: '16px 24px',
-          }}
-        >
-          <span>Hello, {user.name}!</span>
+        <div className="topbar">
+          <a className="brand" href="#"><span className="brand-mark" aria-hidden="true">↗</span>Expense<span>Flow</span></a>
+          <div className="account-menu">
+          <span className="account-name">Hello, {user.name}!</span>
 
           <button
             type="button"
+            className="secondary-button"
             onClick={() => void handleLogout()}
             disabled={loggingOut}
           >
             {loggingOut ? 'Logging out...' : 'Logout'}
           </button>
+          </div>
         </div>
 
         {error && (
@@ -252,23 +248,26 @@ function AuthGate() {
   // ==========================================
 
   return (
-    <main className="dashboard">
-      <header className="dashboard-header">
+    <main className="auth-layout">
+      <header className="auth-story">
         <div>
-          <span className="subtitle">PERSONAL FINANCE</span>
-          <h1>ExpenseFlow</h1>
-          <p>
-            {mode === 'login'
-              ? 'Log in to your account.'
-              : 'Create your personal account.'}
-          </p>
+          <a className="brand" href="#"><span className="brand-mark" aria-hidden="true">↗</span>Expense<span>Flow</span></a>
+          <span className="subtitle">A LITTLE MORE PEACE OF MIND</span>
+          <h1>Life happens.<br />Make room<br />for <em>clarity.</em></h1>
+          <p>Every coffee, every grocery run, every shared expense. Give your everyday spending a place to call home.</p>
+          <div className="auth-illustration" aria-hidden="true"><div className="illustration-card"><span>Little things. A clearer picture.</span><strong>It all adds up.</strong><div className="illustration-bars"><i /><i /><i /><i /><i /><i /><i /></div></div><span className="illustration-seal">↗</span></div>
+          <span className="auth-tagline">Less guesswork. More living.</span>
+
         </div>
       </header>
 
-      <section className="add-expense-section">
+      <section className="auth-panel">
+        <span className="eyebrow">YOUR PERSONAL SPACE</span>
         <h2>
-          {mode === 'login' ? 'Log in' : 'Sign up'}
+          {mode === 'login' ? 'Welcome back.' : 'A fresh start.'}
         </h2>
+
+        <p className="auth-intro">{mode === 'login' ? 'Sign in and pick up where you left off.' : 'Create an account to bring your expenses together.'}</p>
 
         <form onSubmit={(event) => void handleSubmit(event)}>
           <div className="form-grid">
@@ -382,7 +381,7 @@ function AuthGate() {
           </button>
         </form>
 
-        <p style={{ marginTop: '20px' }}>
+        <p className="auth-switch-copy">
           {mode === 'login'
             ? 'Need an account?'
             : 'Already have an account?'}
@@ -390,6 +389,7 @@ function AuthGate() {
 
         <button
           type="button"
+          className="text-button"
           onClick={changeMode}
           disabled={submitting}
         >
