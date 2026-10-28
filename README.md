@@ -100,7 +100,9 @@ Deleting a payer requires confirmation in the UI and permanently removes all
 associated expenses and income in one database transaction.
 
 Apply migration `011_create_incomes.sql` before running the updated app. The
-migration runner requires `DATABASE_URL` and records applied migration checksums:
+migration runner requires `DATABASE_URL` in production, supports local `POSTGRES_*`
+configuration, and records applied migration checksums. Production migration must
+be explicitly approved; see [the release runbook](docs/production-release.md):
 
 ```bash
 cd server
@@ -120,6 +122,15 @@ node --env-file=../.env tests/movements.integration.mjs
 ```
 
 The integration test requires a local PostgreSQL account with database creation
-permission. It creates and removes a uniquely named test database, applies all
+permission. It accepts only a local database host, creates a uniquely named test database, applies all
 migrations there, and checks validation, account isolation and deletion behavior.
-It does not modify the configured application database.
+It does not modify the configured application database. The isolated test database
+is retained for inspection; cleanup requires separate authorization.
+
+Dashboard loading regression tests:
+
+```bash
+node --test client/tests/*.test.mjs
+```
+
+Release diagnosis, backup verification and rollback: [production runbook](docs/production-release.md).
