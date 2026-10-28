@@ -6,8 +6,23 @@ import path from "node:path";
 
 const databaseUrl = process.env.DATABASE_URL;
 
-if (!databaseUrl) {
-  throw new Error("Missing DATABASE_URL");
+const {
+  POSTGRES_USER,
+  POSTGRES_PASSWORD,
+  POSTGRES_DB,
+} = process.env;
+
+// In produzione richiediamo DATABASE_URL
+if (process.env.NODE_ENV === "production" && !databaseUrl) {
+  throw new Error("DATABASE_URL is required in production");
+}
+
+// In locale utilizziamo le credenziali Docker
+if (
+  !databaseUrl &&
+  (!POSTGRES_USER || !POSTGRES_PASSWORD || !POSTGRES_DB)
+) {
+  throw new Error("Missing database configuration");
 }
 
 const migrationsDir = fileURLToPath(
@@ -15,9 +30,21 @@ const migrationsDir = fileURLToPath(
 );
 
 async function migrate() {
-  const client = new pg.Client({
-    connectionString: databaseUrl,
-  });
+const client = new pg.Client({
+  ...(databaseUrl
+    ? {
+        // Database remoto
+        connectionString: databaseUrl,
+      }
+    : {
+        // Database locale Docker
+        host: process.env.POSTGRES_HOST ?? "127.0.0.1",
+        port: Number(process.env.POSTGRES_PORT ?? 5433),
+        user: POSTGRES_USER,
+        password: POSTGRES_PASSWORD,
+        database: POSTGRES_DB,
+      }),
+});
 
   await client.connect();
 
