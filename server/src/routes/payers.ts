@@ -160,3 +160,35 @@ payersRouter.post("/", async (req, res) => {
     });
   }
 });
+
+// Delete all movements and their payer atomically, scoped to the current user.
+payersRouter.delete("/:id", async (req, res) => {
+  const id = req.params.id;
+  if (typeof id !== "string" || !/^[1-9]\d*$/.test(id) || id.length > 19 || BigInt(id) > 9223372036854775807n) {
+    res.status(400).json({ error: "Invalid payer ID" });
+    return;
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const payer = await client.query(
+      "SELECT id FROM payers WHERE id = $1 AND user_id = $2 FOR UPDATE",
+      [id, req.authenticatedUserId],
+    );
+    if (!payer.rowCount) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Payer not found" });
+      return;
+    }
+    await client.query("DELETE FROM expenses WHERE payer_id = $1 AND user_id = $2", [id, req.authenticatedUserId]);
+    await client.query("DELETE FROM payers WHERE id = $1 AND user_id = $2", [id, req.authenticatedUserId]);
+    await client.query("COMMIT");
+    res.status(204).send();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error deleting payer:", error);
+    res.status(500).json({ error: "Unable to delete the payer" });
+  } finally {
+    client.release();
+  }
+});

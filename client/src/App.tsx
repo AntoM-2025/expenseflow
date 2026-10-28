@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import "./App.css";
+import MonthlyChart from "./MonthlyChart";
 
 // ==========================================
 // TYPESCRIPT TYPES
@@ -12,7 +13,10 @@ type Payer = {
   name: string;
 };
 
+type Income = Omit<Expense, "expenseDate"> & { incomeDate: string };
+
 type Expense = {
+  kind?: "expense" | "income";
   id: string;
   amountCents: number;
   category: string;
@@ -94,29 +98,29 @@ function ExpenseTable({
   onDelete,
 }: ExpenseTableProps) {
   const subtotal = expenses.reduce(
-    (total, expense) => total + expense.amountCents,
+    (total, expense) => total + (expense.kind === "income" ? expense.amountCents : -expense.amountCents),
     0,
   );
 
   return (
     <section className="expenses-section">
       <div className="section-header">
-        <h2>Expenses for {payer.name}</h2>
+        <h2><span className="avatar" aria-hidden="true">{payer.name.slice(0, 1).toUpperCase()}</span>{payer.name}</h2>
 
         <span>
-          {expenses.length} transactions · {formatCurrency(subtotal)}
+          {expenses.length} movements · Balance {formatCurrency(subtotal)}
         </span>
       </div>
 
       {expenses.length === 0 ? (
-        <p>No expenses recorded for {payer.name}.</p>
+        <p className="empty-state">No movements yet. The next transaction for {payer.name} will appear here.</p>
       ) : (
         <div className="table-container">
           <table>
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Category</th>
+                <th>Type / Category</th>
                 <th>Description</th>
                 <th>Amount</th>
                 <th>Actions</th>
@@ -125,23 +129,23 @@ function ExpenseTable({
 
             <tbody>
               {expenses.map((expense) => (
-                <tr key={expense.id}>
+                <tr key={`${expense.kind ?? "expense"}-${expense.id}`}>
                   <td>{formatDate(expense.expenseDate)}</td>
 
-                  <td>{expense.category}</td>
+                  <td><span className={`category-badge ${expense.kind === "income" ? "income-badge" : ""}`}>{expense.kind === "income" ? "Income" : "Expense"} · {expense.category}</span></td>
 
                   <td>{expense.description ?? "—"}</td>
 
-                  <td className="amount">
-                    {formatCurrency(expense.amountCents)}
+                  <td className={`amount ${expense.kind === "income" ? "income-amount" : ""}`}>
+                    {expense.kind === "income" ? "+" : "−"}{formatCurrency(expense.amountCents)}
                   </td>
 
                   <td>
                     <button
                       type="button"
                       className="delete-button"
-                      title="Delete expense"
-                      aria-label={`Delete expense ${expense.description ?? expense.category}`}
+                      title="Delete movement"
+                      aria-label={`Delete ${expense.kind ?? "expense"} ${expense.description ?? expense.category}`}
                       disabled={deletingId !== null}
                       onClick={() => void onDelete(expense)}
                     >
@@ -185,6 +189,9 @@ function App() {
 
   const [payers, setPayers] = useState<Payer[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [incomes, setIncomes] = useState<Expense[]>([]);
+  const [movementType, setMovementType] = useState<"expense" | "income">("expense");
+  const [deletingPayerId, setDeletingPayerId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -240,7 +247,7 @@ function App() {
 
     async function loadData() {
       try {
-        const [payersResponse, expensesResponse] = await Promise.all([
+        const [payersResponse, expensesResponse, incomesResponse] = await Promise.all([
           fetch("/api/payers", {
             signal: controller.signal,
           }),
@@ -248,6 +255,7 @@ function App() {
           fetch("/api/expenses", {
             signal: controller.signal,
           }),
+          fetch("/api/incomes", { signal: controller.signal }),
         ]);
 
         if (!payersResponse.ok) {
@@ -258,14 +266,18 @@ function App() {
           throw new Error("Unable to retrieve expenses");
         }
 
-        const [payersData, expensesData] = await Promise.all([
+        if (!incomesResponse.ok) throw new Error("Unable to retrieve incomes");
+
+        const [payersData, expensesData, incomesData] = await Promise.all([
           payersResponse.json() as Promise<Payer[]>,
           expensesResponse.json() as Promise<Expense[]>,
+          incomesResponse.json() as Promise<Income[]>,
         ]);
 
         if (!controller.signal.aborted) {
           setPayers(payersData.sort(sortPayers));
           setExpenses(expensesData);
+          setIncomes(incomesData.map(item => ({ ...item, expenseDate: item.incomeDate, kind: "income" })));
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -343,6 +355,26 @@ function App() {
     }
   }
 
+  async function handleDeletePayer(payer: Payer) {
+    if (deletingPayerId || saving || addingPayer || deletingId) return;
+    if (!window.confirm(`Delete ${payer.name}? All expenses and income belonging to this payer will also be permanently deleted. This cannot be undone.`)) return;
+    setDeletingPayerId(payer.id);
+    setPayerError(null);
+    setPayerSuccess(false);
+    try {
+      const response = await fetch(`/api/payers/${encodeURIComponent(payer.id)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await getApiError(response, "Unable to delete payer"));
+      setPayers(items => items.filter(item => item.id !== payer.id));
+      setExpenses(items => items.filter(item => item.payerId !== payer.id));
+      setIncomes(items => items.filter(item => item.payerId !== payer.id));
+      if (payerId === payer.id) setPayerId("");
+    } catch (err) {
+      setPayerError(err instanceof Error ? err.message : "Unable to delete payer");
+    } finally {
+      setDeletingPayerId(null);
+    }
+  }
+
   // ========================================
   // ADD EXPENSE
   // ========================================
@@ -354,7 +386,7 @@ function App() {
     setSaveSuccess(false);
 
     if (!payerId || !payers.some((payer) => payer.id === payerId)) {
-      setSaveError("Select a payer before recording the expense.");
+      setSaveError("Select a payer before recording the movement.");
 
       return;
     }
@@ -384,7 +416,7 @@ function App() {
     setSaving(true);
 
     try {
-      const response = await fetch("/api/expenses", {
+      const response = await fetch(movementType === "income" ? "/api/incomes" : "/api/expenses", {
         method: "POST",
 
         headers: {
@@ -395,45 +427,23 @@ function App() {
           amountCents,
           category,
           description: description.trim() || undefined,
-          expenseDate,
+          ...(movementType === "income" ? { incomeDate: expenseDate } : { expenseDate }),
           payerId,
         }),
       });
 
       if (!response.ok) {
         throw new Error(
-          await getApiError(response, "Unable to save the expense"),
+          await getApiError(response, "Unable to save the movement"),
         );
       }
 
-      const newExpense: Expense = await response.json();
-
-      // Update expenses.
-      setExpenses((previousExpenses) =>
-        [newExpense, ...previousExpenses].sort((a, b) =>
-          b.expenseDate.localeCompare(a.expenseDate),
-        ),
-      );
-
-      // If a new name was entered,
-      // also add them to the list of payers.
-      if (newExpense.payerId) {
-        setPayers((previousPayers) => {
-          const alreadyExists = previousPayers.some(
-            (payer) => payer.id === newExpense.payerId,
-          );
-
-          if (alreadyExists) {
-            return previousPayers;
-          }
-
-          const newPayer: Payer = {
-            id: newExpense.payerId!,
-            name: newExpense.payer,
-          };
-
-          return [...previousPayers, newPayer].sort(sortPayers);
-        });
+      if (movementType === "income") {
+        const income: Income = await response.json();
+        setIncomes(items => [{ ...income, expenseDate: income.incomeDate, kind: "income" }, ...items]);
+      } else {
+        const expense: Expense = await response.json();
+        setExpenses(items => [expense, ...items]);
       }
 
       setAmount("");
@@ -458,7 +468,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      `Do you want to delete the expense "${expense.description ?? expense.category}" for ${expense.payer} (${formatCurrency(expense.amountCents)})?\n\nThis action cannot be undone.`,
+      `Do you want to delete this ${expense.kind ?? "expense"} "${expense.description ?? expense.category}" for ${expense.payer} (${formatCurrency(expense.amountCents)})?\n\nThis action cannot be undone.`,
     );
 
     if (!confirmed) {
@@ -466,11 +476,11 @@ function App() {
     }
 
     setDeleteError(null);
-    setDeletingId(expense.id);
+    setDeletingId(`${expense.kind ?? "expense"}-${expense.id}`);
 
     try {
       const response = await fetch(
-        `/api/expenses/${encodeURIComponent(expense.id)}`,
+        `/api/${expense.kind === "income" ? "incomes" : "expenses"}/${encodeURIComponent(expense.id)}`,
         {
           method: "DELETE",
         },
@@ -478,13 +488,12 @@ function App() {
 
       if (!response.ok) {
         throw new Error(
-          await getApiError(response, "Unable to delete the expense"),
+          await getApiError(response, "Unable to delete the movement"),
         );
       }
 
-      setExpenses((previousExpenses) =>
-        previousExpenses.filter((item) => item.id !== expense.id),
-      );
+      const update = expense.kind === "income" ? setIncomes : setExpenses;
+      update(items => items.filter(item => item.id !== expense.id));
     } catch (err) {
       setDeleteError(
         err instanceof Error ? err.message : "Error deleting",
@@ -513,6 +522,9 @@ function App() {
     0,
   );
 
+  const totalIncome = incomes.reduce((sum, item) => sum + item.amountCents, 0);
+  const movements = [...expenses, ...incomes].sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
+
   // ========================================
   // USER INTERFACE
   // ========================================
@@ -523,22 +535,36 @@ function App() {
 
       <header className="dashboard-header">
         <div>
-          <span className="subtitle">PERSONAL FINANCE</span>
+          <span className="subtitle">YOUR MONEY, AT A GLANCE</span>
 
-          <h1>ExpenseFlow</h1>
+          <h1>A little clarity.<br /><span>A better everyday.</span></h1>
 
-          <p>Track and manage your daily expenses.</p>
+          <p>All your expenses, together in one calm space.</p>
         </div>
+        <a className="header-action" href="#new-expense">+ Add an expense</a>
       </header>
 
       {/* DYNAMIC SUMMARY */}
 
       <section className="stats">
-        <div className="stat-card">
-          <p>Overall total</p>
-
-          <h2>{formatCurrency(totalExpenses)}</h2>
+        <div className="stat-card stat-card-total">
+          <p><span className="stat-symbol" aria-hidden="true">€</span>Total expenses</p>
+          <h2>{loading ? "—" : error ? "Unavailable" : formatCurrency(totalExpenses)}</h2>
+          <span className="stat-caption">All recorded transactions</span>
         </div>
+        <div className="stat-card">
+          <p><span className="stat-symbol" aria-hidden="true">↗</span>Total income</p>
+          <h2>{loading || error ? "—" : formatCurrency(totalIncome)}</h2>
+          <span className="stat-caption">All recorded income</span>
+        </div>
+        <div className="stat-card">
+          <p><span className="stat-symbol" aria-hidden="true">◎</span>Balance</p>
+          <h2>{loading || error ? "—" : formatCurrency(totalIncome - totalExpenses)}</h2>
+          <span className="stat-caption">Income minus expenses</span>
+        </div>
+      </section>
+
+      {payers.length > 0 && <section className="payer-summaries" aria-label="Totals by payer">
 
         {payers.map((payer) => {
           const payerExpenses = getPayerExpenses(payer);
@@ -550,18 +576,23 @@ function App() {
 
           return (
             <div className="stat-card" key={payer.id}>
-              <p>Total for {payer.name}</p>
+              <p><span className="avatar" aria-hidden="true">{payer.name.slice(0, 1).toUpperCase()}</span>{payer.name}</p>
 
-              <h2>{formatCurrency(total)}</h2>
+              <h2>{formatCurrency(incomes.filter(i => i.payerId === payer.id).reduce((sum, i) => sum + i.amountCents, 0) - total)}</h2>
+              <span className="stat-caption">Balance · Expenses {formatCurrency(total)} · Income {formatCurrency(incomes.filter(i => i.payerId === payer.id).reduce((sum, i) => sum + i.amountCents, 0))}</span>
             </div>
           );
         })}
-      </section>
+      </section>}
 
+      {!loading && !error && <MonthlyChart movements={movements} payers={payers} />}
+
+      <div className="entry-layout">
       {/* PAYER MANAGEMENT */}
 
-      <section className="add-expense-section">
-        <h2>Your payers</h2>
+      <section className="add-expense-section payer-panel">
+        <span className="eyebrow">BETTER TOGETHER</span>
+        <h2>Your people</h2>
 
         <p>Add the people whose expenses you want to track.</p>
 
@@ -601,7 +632,7 @@ function App() {
   <button
     type="submit"
     className="submit-button"
-    disabled={addingPayer}
+    disabled={addingPayer || deletingPayerId !== null || loading || !!error}
   >
     {addingPayer
       ? 'Saving...'
@@ -618,6 +649,7 @@ function App() {
               {payers.map((payer) => (
                 <li className="payer-chip" key={payer.id}>
                   {payer.name}
+                  <button type="button" className="delete-button" aria-label={`Delete payer ${payer.name}`} disabled={deletingPayerId !== null || saving || addingPayer || deletingId !== null} onClick={() => void handleDeletePayer(payer)}>{deletingPayerId === payer.id ? "…" : "×"}</button>
                 </li>
               ))}
             </ul>
@@ -626,11 +658,15 @@ function App() {
 
       {/* NEW EXPENSE */}
 
-      <section className="add-expense-section">
-        <h2>Add an expense</h2>
+      <section className="add-expense-section expense-panel" id="new-expense">
+        <span className="eyebrow">THE EVERYDAY DETAILS</span>
+        <h2>{movementType === "income" ? "Add income" : "Add an expense"}</h2>
 
         <p>Record a new transaction.</p>
 
+        <div className="movement-switch" role="group" aria-label="Movement type">
+          {(["expense", "income"] as const).map(type => <button key={type} type="button" aria-pressed={movementType === type} disabled={saving} onClick={() => { setMovementType(type); setCategory(type === "income" ? "Salary" : "Groceries"); setSaveError(null); setSaveSuccess(false); }}>{type === "income" ? "↗ Income" : "↘ Expense"}</button>)}
+        </div>
         <form onSubmit={handleAddExpense}>
           <div className="form-grid">
             <div className="form-field">
@@ -655,6 +691,9 @@ function App() {
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
               >
+                {movementType === "income" ? <>
+                  {["Salary", "Freelance", "Refund", "Gift", "Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                </> : <>
                 <option value="Groceries">🛒 Groceries</option>
 
                 <option value="Transport">🚌 Transport</option>
@@ -686,6 +725,7 @@ function App() {
                 <option value="Financial Fees">🏦 Financial Fees</option>
 
                 <option value="Other">📦 Other</option>
+                </>}
               </select>
             </div>
 
@@ -718,7 +758,7 @@ function App() {
 
             <div className="form-field">
   <label htmlFor="payer">
-    Who paid?
+    {movementType === "income" ? "Who received it?" : "Who paid?"}
   </label>
 
   <select
@@ -754,19 +794,23 @@ function App() {
 
           {saveSuccess && (
             <p className="success-message" role="status">
-              Expense recorded successfully!
+              Movement recorded successfully!
             </p>
           )}
 
           <button
             type="submit"
             className="submit-button"
-            disabled={saving || payers.length === 0}
+            disabled={saving || payers.length === 0 || deletingPayerId !== null || loading || !!error}
           >
-            {saving ? "Saving..." : "Add expense"}
+            {saving ? "Saving..." : movementType === "income" ? "Add income" : "Add expense"}
           </button>
         </form>
       </section>
+
+      </div>
+
+      <div className="activity-heading"><div><span className="eyebrow">YOUR SPENDING STORY</span><h2>Transaction history</h2></div><span>All time</span></div>
 
       {/* MESSAGES */}
 
@@ -799,8 +843,8 @@ function App() {
               <ExpenseTable
                 key={payer.id}
                 payer={payer}
-                expenses={getPayerExpenses(payer)}
-                deletingId={deletingId}
+                expenses={movements.filter(item => item.payerId === payer.id)}
+                deletingId={deletingPayerId ?? deletingId}
                 onDelete={handleDeleteExpense}
               />
             ))

@@ -5,6 +5,7 @@ import express from "express";
 import { z } from "zod";
 import { pool } from "./db/pool.ts";
 import { authRouter } from "./routes/auth.ts";
+import { incomesRouter } from "./routes/incomes.ts";
 import { payersRouter } from "./routes/payers.ts";
 import { requireAuth } from "./middleware/requireAuth.ts";
 import { requireTrustedOrigin } from "./middleware/requireTrustedOrigin.ts";
@@ -51,6 +52,7 @@ app.use("/api", requireTrustedOrigin);
 app.use("/api/auth", authRouter);
 
 app.use("/api/payers", requireAuth, payersRouter);
+app.use("/api/incomes", requireAuth, incomesRouter);
 
 // ==========================================
 // TYPESCRIPT TYPES
