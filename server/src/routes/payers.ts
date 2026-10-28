@@ -6,7 +6,7 @@ import { pool } from "../db/pool.ts";
 export const payersRouter = Router();
 
 // ==========================================
-// TIPI TYPESCRIPT
+// TYPESCRIPT TYPES
 // ==========================================
 
 type PayerRow = {
@@ -16,20 +16,20 @@ type PayerRow = {
 };
 
 // ==========================================
-// VALIDAZIONE PAGATORE
+// PAYER VALIDATION
 // ==========================================
 
 const payerSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Il nome è obbligatorio")
-    .max(100, "Massimo 100 caratteri"),
+    .min(1, "Name is required")
+    .max(100, "Maximum 100 characters"),
 });
 
 // ==========================================
 // GET /api/payers
-// Recupera i pagatori dell'utente
+// Retrieve the user payers
 // ==========================================
 
 payersRouter.get("/", async (req, res) => {
@@ -37,7 +37,7 @@ payersRouter.get("/", async (req, res) => {
 
   if (!userId) {
     res.status(401).json({
-      error: "Autenticazione richiesta",
+      error: "Authentication required",
     });
 
     return;
@@ -64,19 +64,19 @@ payersRouter.get("/", async (req, res) => {
     res.status(200).json(payers);
   } catch (error) {
     console.error(
-      "Errore recupero pagatori:",
+      "Error retrieving payers:",
       error
     );
 
     res.status(500).json({
-      error: "Impossibile recuperare i pagatori",
+      error: "Unable to retrieve payers",
     });
   }
 });
 
 // ==========================================
 // POST /api/payers
-// Creazione di un nuovo pagatore
+// Create a new payer
 // ==========================================
 
 payersRouter.post("/", async (req, res) => {
@@ -84,20 +84,20 @@ payersRouter.post("/", async (req, res) => {
 
   if (!userId) {
     res.status(401).json({
-      error: "Autenticazione richiesta",
+      error: "Authentication required",
     });
 
     return;
   }
 
-  // 1. Validazione nome
+  // 1. Validate the name
   const validation = payerSchema.safeParse(
     req.body
   );
 
   if (!validation.success) {
     res.status(400).json({
-      error: "Nome del pagatore non valido",
+      error: "Invalid payer name",
       details: validation.error.issues,
     });
 
@@ -107,7 +107,7 @@ payersRouter.post("/", async (req, res) => {
   const { name } = validation.data;
 
   try {
-    // 2. Inserimento nel database
+    // 2. Insert into the database
     const result = await pool.query<PayerRow>(
       `INSERT INTO payers (
         user_id,
@@ -125,18 +125,18 @@ payersRouter.post("/", async (req, res) => {
 
     if (!payer) {
       throw new Error(
-        "Nessun pagatore restituito dal database"
+        "No payer returned by the database"
       );
     }
 
-    // 3. Restituzione pagatore creato
+    // 3. Return the created payer
     res.status(201).json({
       id: payer.id,
       name: payer.name,
       createdAt: payer.created_at,
     });
   } catch (error: unknown) {
-    // PostgreSQL: nome duplicato
+    // PostgreSQL: duplicate name
     if (
       typeof error === "object" &&
       error !== null &&
@@ -144,19 +144,19 @@ payersRouter.post("/", async (req, res) => {
       error.code === "23505"
     ) {
       res.status(409).json({
-        error: "Hai già un pagatore con questo nome",
+        error: "You already have a payer with this name",
       });
 
       return;
     }
 
     console.error(
-      "Errore creazione pagatore:",
+      "Error creating payer:",
       error
     );
 
     res.status(500).json({
-      error: "Impossibile creare il pagatore",
+      error: "Unable to create the payer",
     });
   }
 });

@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import "./App.css";
 
 // ==========================================
-// TIPI TYPESCRIPT
+// TYPESCRIPT TYPES
 // ==========================================
 
 type Payer = {
@@ -31,11 +31,11 @@ type ExpenseTableProps = {
 };
 
 // ==========================================
-// FUNZIONI DI UTILITÀ
+// UTILITY FUNCTIONS
 // ==========================================
 
 function formatCurrency(amountCents: number): string {
-  return new Intl.NumberFormat("it-IT", {
+  return new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
   }).format(amountCents / 100);
@@ -60,7 +60,7 @@ function getTodayDate(): string {
 }
 
 function sortPayers(a: Payer, b: Payer): number {
-  return a.name.localeCompare(b.name, "it", {
+  return a.name.localeCompare(b.name, "en", {
     sensitivity: "base",
   });
 }
@@ -84,7 +84,7 @@ async function getApiError(
 }
 
 // ==========================================
-// COMPONENTE TABELLA SPESE
+// EXPENSE TABLE COMPONENT
 // ==========================================
 
 function ExpenseTable({
@@ -101,25 +101,25 @@ function ExpenseTable({
   return (
     <section className="expenses-section">
       <div className="section-header">
-        <h2>Spese di {payer.name}</h2>
+        <h2>Expenses for {payer.name}</h2>
 
         <span>
-          {expenses.length} operazioni · {formatCurrency(subtotal)}
+          {expenses.length} transactions · {formatCurrency(subtotal)}
         </span>
       </div>
 
       {expenses.length === 0 ? (
-        <p>Nessuna spesa registrata per {payer.name}.</p>
+        <p>No expenses recorded for {payer.name}.</p>
       ) : (
         <div className="table-container">
           <table>
             <thead>
               <tr>
-                <th>Data</th>
-                <th>Categoria</th>
-                <th>Descrizione</th>
-                <th>Importo</th>
-                <th>Azioni</th>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -140,8 +140,8 @@ function ExpenseTable({
                     <button
                       type="button"
                       className="delete-button"
-                      title="Elimina spesa"
-                      aria-label={`Elimina spesa ${expense.description ?? expense.category}`}
+                      title="Delete expense"
+                      aria-label={`Delete expense ${expense.description ?? expense.category}`}
                       disabled={deletingId !== null}
                       onClick={() => void onDelete(expense)}
                     >
@@ -175,12 +175,12 @@ function ExpenseTable({
 }
 
 // ==========================================
-// COMPONENTE PRINCIPALE
+// MAIN COMPONENT
 // ==========================================
 
 function App() {
   // ========================================
-  // DATI
+  // DATA
   // ========================================
 
   const [payers, setPayers] = useState<Payer[]>([]);
@@ -190,7 +190,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // ========================================
-  // NUOVO PAGATORE
+  // NEW PAYER
   // ========================================
 
   const [newPayerName, setNewPayerName] = useState("");
@@ -202,19 +202,19 @@ function App() {
   const [payerSuccess, setPayerSuccess] = useState(false);
 
   // ========================================
-  // CAMPI NUOVA SPESA
+  // NEW EXPENSE FIELDS
   // ========================================
 
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("Alimentari");
+  const [category, setCategory] = useState("Groceries");
   const [description, setDescription] = useState("");
   const [expenseDate, setExpenseDate] = useState(getTodayDate);
 
-  // Nome libero, nessun valore predefinito
+  // Free choice of name, no default value
   const [payerId, setPayerId] = useState("");
 
   // ========================================
-  // STATI SALVATAGGIO
+  // SAVE STATES
   // ========================================
 
   const [saving, setSaving] = useState(false);
@@ -224,7 +224,7 @@ function App() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // ========================================
-  // STATI ELIMINAZIONE
+  // DELETE STATES
   // ========================================
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -232,7 +232,7 @@ function App() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // ========================================
-  // CARICAMENTO DATI
+  // DATA LOADING
   // ========================================
 
   useEffect(() => {
@@ -251,11 +251,11 @@ function App() {
         ]);
 
         if (!payersResponse.ok) {
-          throw new Error("Impossibile recuperare i pagatori");
+          throw new Error("Unable to retrieve payers");
         }
 
         if (!expensesResponse.ok) {
-          throw new Error("Impossibile recuperare le spese");
+          throw new Error("Unable to retrieve expenses");
         }
 
         const [payersData, expensesData] = await Promise.all([
@@ -272,7 +272,7 @@ function App() {
           setError(
             err instanceof Error
               ? err.message
-              : "Errore durante il caricamento",
+              : "Error loading data",
           );
         }
       } finally {
@@ -288,7 +288,7 @@ function App() {
   }, []);
 
   // ========================================
-  // AGGIUNTA PAGATORE
+  // ADD PAYER
   // ========================================
 
   async function handleAddPayer(event: FormEvent<HTMLFormElement>) {
@@ -300,7 +300,7 @@ function App() {
     const name = newPayerName.trim();
 
     if (!name || name.length > 100) {
-      setPayerError("Inserisci un nome da 1 a 100 caratteri.");
+      setPayerError("Enter a name between 1 and 100 characters.");
       return;
     }
 
@@ -321,7 +321,7 @@ function App() {
 
       if (!response.ok) {
         throw new Error(
-          await getApiError(response, "Impossibile creare il pagatore"),
+          await getApiError(response, "Unable to create the payer"),
         );
       }
 
@@ -330,13 +330,13 @@ function App() {
       setPayers((previousPayers) =>
         [...previousPayers, newPayer].sort(sortPayers),
       );
-      // Seleziona il pagatore appena creato
+      // Select the newly created payer
       setPayerId(newPayer.id);
       setNewPayerName("");
       setPayerSuccess(true);
     } catch (err) {
       setPayerError(
-        err instanceof Error ? err.message : "Errore durante il salvataggio",
+        err instanceof Error ? err.message : "Error saving",
       );
     } finally {
       setAddingPayer(false);
@@ -344,7 +344,7 @@ function App() {
   }
 
   // ========================================
-  // AGGIUNTA SPESA
+  // ADD EXPENSE
   // ========================================
 
   async function handleAddExpense(event: FormEvent<HTMLFormElement>) {
@@ -354,7 +354,7 @@ function App() {
     setSaveSuccess(false);
 
     if (!payerId || !payers.some((payer) => payer.id === payerId)) {
-      setSaveError("Seleziona un pagatore prima di registrare la spesa.");
+      setSaveError("Select a payer before recording the expense.");
 
       return;
     }
@@ -362,7 +362,7 @@ function App() {
     const normalizedAmount = amount.trim().replace(",", ".");
 
     if (!/^\d+(\.\d{1,2})?$/.test(normalizedAmount)) {
-      setSaveError("Inserisci un importo valido con massimo due decimali.");
+      setSaveError("Enter a valid amount with up to two decimal places.");
       return;
     }
 
@@ -376,7 +376,7 @@ function App() {
       amountCents > 100_000_000
     ) {
       setSaveError(
-        "L’importo deve essere maggiore di zero e non superiore a 1.000.000 €.",
+        "The amount must be greater than zero and no more than €1,000,000.",
       );
       return;
     }
@@ -402,21 +402,21 @@ function App() {
 
       if (!response.ok) {
         throw new Error(
-          await getApiError(response, "Impossibile salvare la spesa"),
+          await getApiError(response, "Unable to save the expense"),
         );
       }
 
       const newExpense: Expense = await response.json();
 
-      // Aggiorniamo le spese.
+      // Update expenses.
       setExpenses((previousExpenses) =>
         [newExpense, ...previousExpenses].sort((a, b) =>
           b.expenseDate.localeCompare(a.expenseDate),
         ),
       );
 
-      // Se abbiamo digitato un nome nuovo,
-      // aggiungiamolo anche all'elenco dei pagatori.
+      // If a new name was entered,
+      // also add them to the list of payers.
       if (newExpense.payerId) {
         setPayers((previousPayers) => {
           const alreadyExists = previousPayers.some(
@@ -441,7 +441,7 @@ function App() {
       setSaveSuccess(true);
     } catch (err) {
       setSaveError(
-        err instanceof Error ? err.message : "Errore durante il salvataggio",
+        err instanceof Error ? err.message : "Error saving",
       );
     } finally {
       setSaving(false);
@@ -449,7 +449,7 @@ function App() {
   }
 
   // ========================================
-  // ELIMINAZIONE SPESA
+  // DELETE EXPENSE
   // ========================================
 
   async function handleDeleteExpense(expense: Expense) {
@@ -458,7 +458,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      `Vuoi eliminare la spesa "${expense.description ?? expense.category}" di ${expense.payer} (${formatCurrency(expense.amountCents)})?\n\nQuesta operazione è definitiva.`,
+      `Do you want to delete the expense "${expense.description ?? expense.category}" for ${expense.payer} (${formatCurrency(expense.amountCents)})?\n\nThis action cannot be undone.`,
     );
 
     if (!confirmed) {
@@ -478,7 +478,7 @@ function App() {
 
       if (!response.ok) {
         throw new Error(
-          await getApiError(response, "Impossibile eliminare la spesa"),
+          await getApiError(response, "Unable to delete the expense"),
         );
       }
 
@@ -487,7 +487,7 @@ function App() {
       );
     } catch (err) {
       setDeleteError(
-        err instanceof Error ? err.message : "Errore durante l’eliminazione",
+        err instanceof Error ? err.message : "Error deleting",
       );
     } finally {
       setDeletingId(null);
@@ -495,7 +495,7 @@ function App() {
   }
 
   // ========================================
-  // FILTRI E TOTALI
+  // FILTERS AND TOTALS
   // ========================================
 
   function getPayerExpenses(payer: Payer): Expense[] {
@@ -503,8 +503,8 @@ function App() {
       (expense) =>
         expense.payerId === payer.id ||
         (expense.payerId === null &&
-          expense.payer.toLocaleLowerCase("it-IT") ===
-            payer.name.toLocaleLowerCase("it-IT")),
+          expense.payer.toLocaleLowerCase("en-GB") ===
+            payer.name.toLocaleLowerCase("en-GB")),
     );
   }
 
@@ -514,7 +514,7 @@ function App() {
   );
 
   // ========================================
-  // INTERFACCIA
+  // USER INTERFACE
   // ========================================
 
   return (
@@ -527,15 +527,15 @@ function App() {
 
           <h1>ExpenseFlow</h1>
 
-          <p>Monitora e gestisci le tue spese quotidiane.</p>
+          <p>Track and manage your daily expenses.</p>
         </div>
       </header>
 
-      {/* RIEPILOGO DINAMICO */}
+      {/* DYNAMIC SUMMARY */}
 
       <section className="stats">
         <div className="stat-card">
-          <p>Totale complessivo</p>
+          <p>Overall total</p>
 
           <h2>{formatCurrency(totalExpenses)}</h2>
         </div>
@@ -550,7 +550,7 @@ function App() {
 
           return (
             <div className="stat-card" key={payer.id}>
-              <p>Totale {payer.name}</p>
+              <p>Total for {payer.name}</p>
 
               <h2>{formatCurrency(total)}</h2>
             </div>
@@ -558,24 +558,24 @@ function App() {
         })}
       </section>
 
-      {/* GESTIONE PAGATORI */}
+      {/* PAYER MANAGEMENT */}
 
       <section className="add-expense-section">
-        <h2>I tuoi pagatori</h2>
+        <h2>Your payers</h2>
 
-        <p>Aggiungi le persone di cui vuoi monitorare le spese.</p>
+        <p>Add the people whose expenses you want to track.</p>
 
         <form onSubmit={handleAddPayer}>
   <div className="form-grid">
     <div className="form-field">
       <label htmlFor="newPayerName">
-        Nome del nuovo pagatore
+        New payer name
       </label>
 
       <input
         id="newPayerName"
         type="text"
-        placeholder="Es. Luca, Sofia, Giovanni..."
+        placeholder="E.g. Luca, Sofia, Giovanni..."
         value={newPayerName}
         onChange={(event) =>
           setNewPayerName(event.target.value)
@@ -594,7 +594,7 @@ function App() {
 
   {payerSuccess && (
     <p className="success-message" role="status">
-      Pagatore aggiunto correttamente!
+      Payer added successfully!
     </p>
   )}
 
@@ -604,15 +604,15 @@ function App() {
     disabled={addingPayer}
   >
     {addingPayer
-      ? 'Salvataggio...'
-      : 'Aggiungi pagatore'}
+      ? 'Saving...'
+      : 'Add payer'}
   </button>
 </form>
 
         {!loading &&
           !error &&
           (payers.length === 0 ? (
-            <p>Non hai ancora aggiunto pagatori.</p>
+            <p>You have not added any payers yet.</p>
           ) : (
             <ul className="payer-list">
               {payers.map((payer) => (
@@ -624,23 +624,23 @@ function App() {
           ))}
       </section>
 
-      {/* NUOVA SPESA */}
+      {/* NEW EXPENSE */}
 
       <section className="add-expense-section">
-        <h2>Aggiungi una spesa</h2>
+        <h2>Add an expense</h2>
 
-        <p>Registra una nuova operazione.</p>
+        <p>Record a new transaction.</p>
 
         <form onSubmit={handleAddExpense}>
           <div className="form-grid">
             <div className="form-field">
-              <label htmlFor="amount">Importo (€)</label>
+              <label htmlFor="amount">Amount (€)</label>
 
               <input
                 id="amount"
                 type="text"
                 inputMode="decimal"
-                placeholder="Es. 12,50"
+                placeholder="E.g. 12.50"
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 required
@@ -648,34 +648,34 @@ function App() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="category">Categoria</label>
+              <label htmlFor="category">Category</label>
 
               <select
                 id="category"
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
               >
-                <option value="Alimentari">Alimentari</option>
+                <option value="Groceries">Groceries</option>
 
-                <option value="Trasporti">Trasporti</option>
+                <option value="Transport">Transport</option>
 
-                <option value="Casa">Casa</option>
+                <option value="Home">Home</option>
 
-                <option value="Salute">Salute</option>
+                <option value="Health">Health</option>
 
-                <option value="Svago">Svago</option>
+                <option value="Leisure">Leisure</option>
 
-                <option value="Altro">Altro</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 
             <div className="form-field">
-              <label htmlFor="description">Descrizione</label>
+              <label htmlFor="description">Description</label>
 
               <input
                 id="description"
                 type="text"
-                placeholder="Es. Pranzo al ristorante"
+                placeholder="E.g. Lunch at a restaurant"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 maxLength={500}
@@ -683,7 +683,7 @@ function App() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="expenseDate">Data</label>
+              <label htmlFor="expenseDate">Date</label>
 
               <input
                 id="expenseDate"
@@ -694,11 +694,11 @@ function App() {
               />
             </div>
 
-            {/* PAGATORE LIBERO */}
+            {/* PAYER SELECTION */}
 
             <div className="form-field">
   <label htmlFor="payer">
-    Chi ha pagato?
+    Who paid?
   </label>
 
   <select
@@ -711,7 +711,7 @@ function App() {
     required
   >
     <option value="" disabled>
-      Seleziona un pagatore
+      Select a payer
     </option>
 
     {payers.map((payer) => (
@@ -734,7 +734,7 @@ function App() {
 
           {saveSuccess && (
             <p className="success-message" role="status">
-              Spesa registrata correttamente!
+              Expense recorded successfully!
             </p>
           )}
 
@@ -743,14 +743,14 @@ function App() {
             className="submit-button"
             disabled={saving || payers.length === 0}
           >
-            {saving ? "Salvataggio..." : "Aggiungi spesa"}
+            {saving ? "Saving..." : "Add expense"}
           </button>
         </form>
       </section>
 
-      {/* MESSAGGI */}
+      {/* MESSAGES */}
 
-      {loading && <p role="status">Caricamento dei dati...</p>}
+      {loading && <p role="status">Loading data...</p>}
 
       {error && (
         <p className="error-message" role="alert">
@@ -764,15 +764,15 @@ function App() {
         </p>
       )}
 
-      {/* TABELLE DINAMICHE */}
+      {/* DYNAMIC TABLES */}
 
       {!loading && !error && (
         <>
           {payers.length === 0 ? (
             <section className="expenses-section">
-              <h2>Le tue spese</h2>
+              <h2>Your expenses</h2>
 
-              <p>Aggiungi un pagatore per iniziare a monitorare le spese.</p>
+              <p>Add a payer to start tracking expenses.</p>
             </section>
           ) : (
             payers.map((payer) => (

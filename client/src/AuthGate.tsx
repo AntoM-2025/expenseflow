@@ -37,7 +37,7 @@ function AuthGate() {
   const [success, setSuccess] = useState<string | null>(null)
 
   // ==========================================
-  // VERIFICA SESSIONE ALL'AVVIO
+  // CHECK SESSION ON STARTUP
   // ==========================================
 
   useEffect(() => {
@@ -57,14 +57,14 @@ function AuthGate() {
             setUser(data.user)
           }
         } else if (response.status !== 401) {
-          throw new Error('Impossibile verificare la sessione')
+          throw new Error('Unable to verify the session')
         }
       } catch (err) {
         if (!controller.signal.aborted) {
           setError(
             err instanceof Error
               ? err.message
-              : 'Errore di connessione'
+              : 'Connection error'
           )
         }
       } finally {
@@ -80,7 +80,7 @@ function AuthGate() {
   }, [])
 
   // ==========================================
-  // LOGIN E REGISTRAZIONE
+  // LOGIN AND REGISTRATION
   // ==========================================
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -90,7 +90,7 @@ function AuthGate() {
     setSuccess(null)
 
     if (mode === 'register' && password !== confirmPassword) {
-      setError('Le password non coincidono')
+      setError('Passwords do not match')
       return
     }
 
@@ -120,13 +120,13 @@ function AuthGate() {
 
       if (!response.ok) {
         throw new Error(
-          data.error ?? 'Operazione non riuscita'
+          data.error ?? 'Operation failed'
         )
       }
 
       if (mode === 'register') {
         setSuccess(
-          'Account creato correttamente! Ora puoi accedere.'
+          'Account created successfully! You can now log in.'
         )
 
         setMode('login')
@@ -134,7 +134,7 @@ function AuthGate() {
         setConfirmPassword('')
       } else {
         if (!data.user) {
-          throw new Error('Risposta del server non valida')
+          throw new Error('Invalid server response')
         }
 
         setUser(data.user)
@@ -144,7 +144,7 @@ function AuthGate() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Si è verificato un errore'
+          : 'An error occurred'
       )
     } finally {
       setSubmitting(false)
@@ -166,7 +166,7 @@ function AuthGate() {
       })
 
       if (!response.ok) {
-        throw new Error('Impossibile effettuare il logout')
+        throw new Error('Unable to log out')
       }
 
       setUser(null)
@@ -175,7 +175,7 @@ function AuthGate() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Errore durante il logout'
+          : 'Error logging out'
       )
     } finally {
       setLoggingOut(false)
@@ -183,7 +183,7 @@ function AuthGate() {
   }
 
   // ==========================================
-  // CAMBIO LOGIN / REGISTRAZIONE
+  // SWITCH LOGIN / REGISTRATION
   // ==========================================
 
   function changeMode() {
@@ -198,19 +198,19 @@ function AuthGate() {
   }
 
   // ==========================================
-  // CARICAMENTO
+  // LOADING
   // ==========================================
 
   if (checkingSession) {
     return (
       <main className="dashboard">
-        <p role="status">Verifica della sessione...</p>
+        <p role="status">Checking session...</p>
       </main>
     )
   }
 
   // ==========================================
-  // DASHBOARD AUTENTICATA
+  // AUTHENTICATED DASHBOARD
   // ==========================================
 
   if (user) {
@@ -225,14 +225,14 @@ function AuthGate() {
             padding: '16px 24px',
           }}
         >
-          <span>Ciao, {user.name}!</span>
+          <span>Hello, {user.name}!</span>
 
           <button
             type="button"
             onClick={() => void handleLogout()}
             disabled={loggingOut}
           >
-            {loggingOut ? 'Uscita...' : 'Logout'}
+            {loggingOut ? 'Logging out...' : 'Logout'}
           </button>
         </div>
 
@@ -248,7 +248,7 @@ function AuthGate() {
   }
 
   // ==========================================
-  // LOGIN / REGISTRAZIONE
+  // LOGIN / REGISTRATION
   // ==========================================
 
   return (
@@ -259,22 +259,22 @@ function AuthGate() {
           <h1>ExpenseFlow</h1>
           <p>
             {mode === 'login'
-              ? 'Accedi al tuo account.'
-              : 'Crea il tuo account personale.'}
+              ? 'Log in to your account.'
+              : 'Create your personal account.'}
           </p>
         </div>
       </header>
 
       <section className="add-expense-section">
         <h2>
-          {mode === 'login' ? 'Accedi' : 'Registrati'}
+          {mode === 'login' ? 'Log in' : 'Sign up'}
         </h2>
 
         <form onSubmit={(event) => void handleSubmit(event)}>
           <div className="form-grid">
             {mode === 'register' && (
               <div className="form-field">
-                <label htmlFor="auth-name">Nome</label>
+                <label htmlFor="auth-name">Name</label>
 
                 <input
                   id="auth-name"
@@ -340,7 +340,7 @@ function AuthGate() {
             {mode === 'register' && (
               <div className="form-field">
                 <label htmlFor="auth-confirm-password">
-                  Conferma password
+                  Confirm password
                 </label>
 
                 <input
@@ -375,17 +375,17 @@ function AuthGate() {
             disabled={submitting}
           >
             {submitting
-              ? 'Attendere...'
+              ? 'Please wait...'
               : mode === 'login'
-                ? 'Accedi'
-                : 'Crea account'}
+                ? 'Log in'
+                : 'Create account'}
           </button>
         </form>
 
         <p style={{ marginTop: '20px' }}>
           {mode === 'login'
-            ? 'Non hai ancora un account?'
-            : 'Hai già un account?'}
+            ? 'Need an account?'
+            : 'Already have an account?'}
         </p>
 
         <button
@@ -394,8 +394,8 @@ function AuthGate() {
           disabled={submitting}
         >
           {mode === 'login'
-            ? 'Registrati'
-            : 'Torna al login'}
+            ? 'Sign up'
+            : 'Back to login'}
         </button>
       </section>
     </main>

@@ -1,18 +1,18 @@
 import type { RequestHandler } from "express";
 
-// Metodi che non devono modificare i dati
+// Methods that must not modify data
 const safeMethods = new Set([
   "GET",
   "HEAD",
   "OPTIONS",
 ]);
 
-// Indirizzi autorizzati, letti dall'ambiente
+// Allowed origins read from the environment
 const allowedOrigins = new Set(
   [
     ...(process.env.APP_ORIGINS ?? "").split(","),
 
-    // URL pubblico fornito automaticamente da Render
+    // Public URL automatically provided by Render
     process.env.RENDER_EXTERNAL_URL ?? "",
   ]
     .map((origin) => origin.trim())
@@ -21,7 +21,7 @@ const allowedOrigins = new Set(
 
 if (allowedOrigins.size === 0) {
   throw new Error(
-    "APP_ORIGINS non configurato"
+    "APP_ORIGINS is not configured"
   );
 }
 
@@ -30,30 +30,30 @@ export const requireTrustedOrigin: RequestHandler = (
   res,
   next
 ) => {
-  // Le richieste di sola lettura sono consentite
+  // Read-only requests are allowed
   if (safeMethods.has(req.method)) {
     next();
     return;
   }
 
-  // Informazione inviata dai browser moderni
+  // Information sent by modern browsers
   const fetchSite = req.get("Sec-Fetch-Site");
 
-  // Blocchiamo richieste provenienti da altri siti
+  // Block requests from other sites
   if (fetchSite && fetchSite !== "same-origin") {
     res.status(403).json({
-      error: "Origine della richiesta non autorizzata",
+      error: "Request origin not allowed",
     });
     return;
   }
 
   const origin = req.get("Origin");
 
-  // Se Origin è presente, deve essere autorizzato
+  // If Origin is present, it must be allowed
   if (origin) {
     if (!allowedOrigins.has(origin)) {
       res.status(403).json({
-        error: "Origine della richiesta non autorizzata",
+        error: "Request origin not allowed",
       });
       return;
     }
@@ -62,11 +62,11 @@ export const requireTrustedOrigin: RequestHandler = (
     return;
   }
 
-  // Se manca Origin, richiediamo una conferma
-  // di provenienza dallo stesso sito
+  // If Origin is missing, require confirmation
+  // that the request comes from the same site
   if (fetchSite !== "same-origin") {
     res.status(403).json({
-      error: "Impossibile verificare l'origine",
+      error: "Unable to verify the origin",
     });
     return;
   }

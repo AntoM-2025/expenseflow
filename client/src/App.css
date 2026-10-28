@@ -212,17 +212,17 @@ td {
   }
 }
 
-/* Tre schede riepilogative */
+/* Three summary cards */
 .stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* Spazio tra le due tabelle */
+/* Space between the two tables */
 .expenses-section + .expenses-section {
   margin-top: 24px;
 }
 
-/* Pulsante elimina */
+/* Delete button */
 .delete-button {
   display: inline-flex;
   align-items: center;
@@ -269,7 +269,7 @@ td {
 }
 
 /* ==========================================
-   RIEPILOGO DINAMICO
+   DYNAMIC SUMMARY
 ========================================== */
 
 .stats {
@@ -280,7 +280,7 @@ td {
 }
 
 /* ==========================================
-   ELENCO PAGATORI
+   PAYER LIST
 ========================================== */
 
 .payer-list {

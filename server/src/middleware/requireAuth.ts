@@ -8,7 +8,7 @@ import {
 } from "../auth/session.ts";
 
 // ==========================================
-// ESTENSIONE REQUEST EXPRESS
+// EXPRESS REQUEST EXTENSION
 // ==========================================
 
 declare global {
@@ -20,7 +20,7 @@ declare global {
 }
 
 // ==========================================
-// MIDDLEWARE AUTENTICAZIONE
+// AUTHENTICATION MIDDLEWARE
 // ==========================================
 
 export const requireAuth: RequestHandler = async (
@@ -28,22 +28,22 @@ export const requireAuth: RequestHandler = async (
   res,
   next
 ) => {
-  // 1. Recuperiamo il token dal cookie
+  // 1. Retrieve the token from the cookie
   const sessionToken = getSessionToken(req);
 
   if (!sessionToken) {
     res.status(401).json({
-      error: "Autenticazione richiesta",
+      error: "Authentication required",
     });
 
     return;
   }
 
   try {
-    // 2. Calcoliamo l'hash del token
+    // 2. Compute the token hash
     const tokenHash = hashSessionToken(sessionToken);
 
-    // 3. Cerchiamo una sessione valida
+    // 3. Find a valid session
     const result = await pool.query<{
       user_id: string;
     }>(
@@ -58,22 +58,22 @@ export const requireAuth: RequestHandler = async (
 
     if (!session) {
       res.status(401).json({
-        error: "Sessione non valida o scaduta",
+        error: "Invalid or expired session",
       });
 
       return;
     }
 
-    // 4. Rendiamo disponibile l'ID utente
+    // 4. Make the user ID available
     req.authenticatedUserId = session.user_id;
 
-    // 5. Continuiamo verso la route richiesta
+    // 5. Continue to the requested route
     next();
   } catch (error) {
-    console.error("Errore autenticazione:", error);
+    console.error("Authentication error:", error);
 
     res.status(500).json({
-      error: "Impossibile verificare l'autenticazione",
+      error: "Unable to verify authentication",
     });
   }
 };
