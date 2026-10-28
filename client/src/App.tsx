@@ -655,17 +655,37 @@ function App() {
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
               >
-                <option value="Groceries">Groceries</option>
+                <option value="Groceries">🛒 Groceries</option>
 
-                <option value="Transport">Transport</option>
+                <option value="Transport">🚌 Transport</option>
 
-                <option value="Home">Home</option>
+                <option value="Home">🏠 Home</option>
 
-                <option value="Health">Health</option>
+                <option value="Health">🩺 Health</option>
 
-                <option value="Leisure">Leisure</option>
+                <option value="Leisure">🎮 Leisure</option>
 
-                <option value="Other">Other</option>
+                <option value="Dining Out">🍽️ Dining Out</option>
+
+                <option value="Shopping">🛍️ Shopping</option>
+
+                <option value="Bills & Utilities">💡 Bills &amp; Utilities</option>
+
+                <option value="Subscriptions">📱 Subscriptions</option>
+
+                <option value="Travel">✈️ Travel</option>
+
+                <option value="Education">📚 Education</option>
+
+                <option value="Gifts & Donations">🎁 Gifts &amp; Donations</option>
+
+                <option value="Personal Care">💇 Personal Care</option>
+
+                <option value="Pets">🐾 Pets</option>
+
+                <option value="Financial Fees">🏦 Financial Fees</option>
+
+                <option value="Other">📦 Other</option>
               </select>
             </div>
 
