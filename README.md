@@ -91,3 +91,35 @@ See each package's scripts for the available development commands.
 ## Status
 
 Under active development.
+
+## Income, payer deletion and monthly overview
+
+Each payer supports expenses and income. The dashboard displays income minus
+expenses as the balance, and the monthly chart can be filtered by payer and year.
+Deleting a payer requires confirmation in the UI and permanently removes all
+associated expenses and income in one database transaction.
+
+Apply migration `011_create_incomes.sql` before running the updated app. The
+migration runner requires `DATABASE_URL` and records applied migration checksums:
+
+```bash
+cd server
+npm run build
+npm run migrate
+```
+
+Additional authenticated endpoints: `GET/POST /api/incomes`,
+`DELETE /api/incomes/:id`, and `DELETE /api/payers/:id`.
+
+Run checks (Node.js 24+):
+
+```bash
+node --test client/tests/monthlyTotals.test.mjs
+cd server
+node --env-file=../.env tests/movements.integration.mjs
+```
+
+The integration test requires a local PostgreSQL account with database creation
+permission. It creates and removes a uniquely named test database, applies all
+migrations there, and checks validation, account isolation and deletion behavior.
+It does not modify the configured application database.
